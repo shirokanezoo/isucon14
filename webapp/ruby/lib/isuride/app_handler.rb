@@ -313,7 +313,7 @@ module Isuride
           s[:ride_id] # TODO: index
         end.first
         unless yet_sent_ride_status
-          halt json(data: nil, retry_after_ms: 30)
+          halt json(data: nil, retry_after_ms: 100)
         end
 
         status = yet_sent_ride_status.fetch(:status)
@@ -321,6 +321,21 @@ module Isuride
         ride = tx.xquery('SELECT * FROM rides WHERE id = ? FOR SHARE', yet_sent_ride_status.fetch(:ride_id)).first
 
         fare = calculate_discounted_fare(tx, @current_user.id, ride, ride.fetch(:pickup_latitude), ride.fetch(:pickup_longitude), ride.fetch(:destination_latitude), ride.fetch(:destination_longitude))
+
+        retry_after_ms = case status
+                         when 'MATCHING'
+                           50
+                         when 'ENROUTE'
+                           100
+                         when 'PICKUP'
+                           100
+                         when 'CARRYING'
+                           50
+                         when 'ARRIVED'
+                           100
+                         when 'COMPLETED'
+                           300
+                         end
 
         response = {
           data: {
@@ -338,7 +353,7 @@ module Isuride
             created_at: time_msec(ride.fetch(:created_at)),
             updated_at: time_msec(ride.fetch(:updated_at)),
           },
-          retry_after_ms: 30,
+          retry_after_ms:,
         }
 
         unless ride.fetch(:chair_id).nil?
