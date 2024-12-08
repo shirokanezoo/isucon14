@@ -308,8 +308,8 @@ module Isuride
 
     # GET /api/app/notification
     get '/notification' do
-      response = db_transaction do |tx|
-        yet_sent_ride_status = tx.xquery('SELECT * FROM ride_statuses WHERE user_id = ? and app_sent_at is null for share', @current_user.id).to_a.sort_by do |s|
+      response = begin; tx=db#db_transaction do |tx|
+        yet_sent_ride_status = tx.xquery('SELECT * FROM ride_statuses WHERE user_id = ? and app_sent_at is null', @current_user.id).to_a.sort_by do |s|
           s[:ride_id] # TODO: index
         end.first
         unless yet_sent_ride_status
@@ -318,7 +318,7 @@ module Isuride
 
         status = yet_sent_ride_status.fetch(:status)
 
-        ride = tx.xquery('SELECT * FROM rides WHERE id = ? FOR SHARE', yet_sent_ride_status.fetch(:ride_id)).first
+        ride = tx.xquery('SELECT * FROM rides WHERE id = ?', yet_sent_ride_status.fetch(:ride_id)).first
 
         fare = calculate_discounted_fare(tx, @current_user.id, ride, ride.fetch(:pickup_latitude), ride.fetch(:pickup_longitude), ride.fetch(:destination_latitude), ride.fetch(:destination_longitude))
 
