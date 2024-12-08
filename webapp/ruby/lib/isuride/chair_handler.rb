@@ -83,7 +83,10 @@ module Isuride
 
       response = db_transaction do |tx|
         distance_updated_at = Time.now
-        distance = (req.latitude - @current_chair.first_latitude).abs + (req.longitude - @current_chair.first_longitude).abs
+        distance = 0
+        if !@current_chair.latitude.nil? && !@current_chair.longitude.nil?
+          distance = (req.latitude - @current_chair.latitude).abs + (req.longitude - @current_chair.longitude).abs + @current_chair.total_distance
+        end
         tx.xquery(
           'UPDATE chairs SET latitude = ?, longitude = ?, total_distance = ?, total_distance_updated_at = ? WHERE id = ?',
           req.latitude, req.longitude, distance, distance_updated_at, @current_chair.id
