@@ -41,7 +41,7 @@ module Isuride
         end
 
         begin
-          updated_ride = db_transaction(db) do |tx|
+          updated_ride = db_transaction do |tx|
             chair2 = tx.xquery('SELECT id FROM chairs WHERE is_active = TRUE AND is_busy = FALSE AND id = ? LIMIT 1 for update', candidate_chair.fetch(:id)).first
             ride2 = tx.xquery('SELECT id FROM rides WHERE id = ? AND chair_id IS NULL LIMIT 1 for update', ride.fetch(:id)).first
             if chair2 && ride2
