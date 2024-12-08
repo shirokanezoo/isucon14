@@ -402,7 +402,7 @@ module Isuride
 
       response = db_transaction do |tx|
         chairs = tx.query(
-          'SELECT chairs.id as id, chars.name as `name`, chars.model as model, chair_locations2.latitude as latitude, chair_locations2.longitude as longitude FROM chairs LEFT OUTER JOIN chair_locations2 ON chairs.id = chair_locations2.id WHERE chairs.is_busy = FALSE and chairs.is_active = TRUE'
+          'SELECT chairs.id as id, chairs.name as `name`, chairs.model as model, chair_locations2.latitude as latitude, chair_locations2.longitude as longitude FROM chairs LEFT OUTER JOIN chair_locations2 ON chairs.id = chair_locations2.id WHERE chairs.is_busy = FALSE and chairs.is_active = TRUE'
         )
 
         nearby_chairs = chairs.filter_map do |chair|
