@@ -17,7 +17,21 @@ module Isuride
       :invitation_code,
       :created_at,
       :updated_at,
-    )
+    ) do
+      def as_hash
+        {
+          id:,
+          username:,
+          firstname:,
+          lastname:,
+          date_of_birth:,
+          access_token:,
+          invitation_code:,
+          created_at:,
+          updated_at:,
+        }
+      end
+    end
 
     before do
       if request.path == '/api/app/users'
@@ -220,7 +234,7 @@ module Isuride
         calculate_discounted_fare(tx, @current_user.id, ride, req.pickup_coordinate.latitude, req.pickup_coordinate.longitude, req.destination_coordinate.latitude, req.destination_coordinate.longitude)
 
       end
-      ride_publish(db, ride:, ride_status:, user: @current_user) if ride && ride_status
+      ride_publish(db, ride:, ride_status:, user: @current_user.as_hash) if ride && ride_status
 
       status(202)
       json(ride_id:, fare:)
@@ -312,7 +326,7 @@ module Isuride
           completed_at: time_msec(ride.fetch(:updated_at)),
         }
       end
-      ride_publish(db, ride:, ride_status:, user: @current_user) if ride && ride_status
+      ride_publish(db, ride:, ride_status:, user: @current_user.as_hash) if ride && ride_status
 
       json(response)
     end
