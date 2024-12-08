@@ -123,8 +123,8 @@ module Isuride
 
         status = yet_sent_ride_status.fetch(:status)
 
-        ride = tx.xquery('SELECT * FROM rides WHERE id = ? FOR SHARE', ride.fetch(:id)).first
-        user = tx.xquery('SELECT * FROM users WHERE id = ? FOR SHARE', ride.fetch(:user_id)).first
+        ride = tx.xquery('SELECT * FROM rides WHERE id = ? FOR SHARE', yet_sent_ride_status.fetch(:id)).first
+        user = tx.xquery('SELECT * FROM users WHERE id = ? FOR SHARE', yet_sent_ride_status.fetch(:user_id)).first
 
         tx.xquery('UPDATE ride_statuses SET chair_sent_at = CURRENT_TIMESTAMP(6) WHERE id = ?', yet_sent_ride_status.fetch(:id))
         tx.xquery("UPDATE chairs SET is_busy = FALSE, underway_ride_id = '' where id = ? and underway_ride_id = ?", ride.fetch(:chair_id), ride.fetch(:id)) if status == 'COMPLETED'
