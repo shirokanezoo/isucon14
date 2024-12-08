@@ -1,0 +1,18 @@
+name: 'isuride'
+services:
+  mysql:
+    image: public.ecr.aws/docker/library/mysql:8.0-oracle
+    command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: himitsu
+      MYSQL_USER: isucon
+      MYSQL_PASSWORD: isucon
+      MYSQL_DATABASE: isuride
+    volumes:
+      - ./db/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+      - mysql:/var/lib/mysql
+    ports:
+      - "13306:3306"
+
+volumes:
+  mysql: {}
