@@ -41,23 +41,24 @@ module Isuride
         end
 
         begin
-          updated_ride = db_transaction do |tx|
+          updated_ride, updated_chair, updated_ride_status = db_transaction do |tx|
             chair2 = tx.xquery('SELECT id FROM chairs WHERE is_active = TRUE AND is_busy = FALSE AND id = ? LIMIT 1 for update', candidate_chair.fetch(:id)).first
             ride2 = tx.xquery('SELECT id FROM rides WHERE id = ? AND chair_id IS NULL LIMIT 1 for update', ride.fetch(:id)).first
             if chair2 && ride2
               tx.xquery("UPDATE ride_statuses SET chair_id = ? WHERE ride_id = ? and status = 'MATCHING'", chair2.fetch(:id), ride2.fetch(:id))
               tx.xquery('UPDATE chairs SET is_busy = TRUE, underway_ride_id = ? WHERE id = ?', ride2.fetch(:id), chair2.fetch(:id))
               tx.xquery('UPDATE rides SET chair_id = ? WHERE id = ?', chair2.fetch(:id), ride2.fetch(:id))
-              ride2[:chair_id] = chair2.fetch(:id)
+              chair2[:is_busy] = true
+              chair2[:underway_ride_id] = ride2[:chair_id] = chair2.fetch(:id)
               puts "MATCHING-RESOLVE:: chair_id=#{chair2.fetch(:id)} ride_id=#{ride2.fetch(:id)} ok=true"
-              ride2
+              [ride2, chair2, tx.xquery("SELECT * FROM ride_statuses WHERE ride_id = ? and status = 'MATCHING'", ride2.fetch(:id)).first]
             else
               puts "MATCHING-RESOLVE:: chair_id=#{chair2.fetch(:id)} ride_id=#{ride2.fetch(:id)} reason=taken-after-tx"
               available_chairs.delete(candidate_chair.fetch(:id))
               nil
             end
           end
-          ride_publish(db,updated_ride) if updated_ride
+          ride_publish(db:, ride: updated_ride, ride_status: updated_ride_status, chair: updated_chair) if updated_ride
           available_chairs.delete(candidate_chair.fetch(:id))
         rescue Mysql2::Error => e
           warn "MATCHING-ERROR:: ride_id=#{ride.fetch(:id)} candidate_chair_id=#{candidate_chair.fetch(:id)} exception=#{e.full_message}"

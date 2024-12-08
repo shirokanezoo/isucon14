@@ -152,21 +152,17 @@ module Isuride
         INITIAL_FARE + discounted_metered_fare
       end
 
-      def ride_publish(tx, ride)
-        ride_user_publish(tx, ride)
-        ride_chair_publish(tx, ride)
+      def ride_publish(tx, ride:, ride_status:, chair: nil, user: nil)
+        chair ||= ride[:chair_id] && tx.xquery('SELECT * FROM charis id = ?', ride.fetch(:chair_id)).first
+        user ||= tx.xquery('SELECT * FROM users WHERE id = ?', ride.fetch(:user_id)).first
+        ride_user_publish(tx, ride:, ride_status:, chair:, user:)
+        ride_chair_publish(tx, ride:, ride_status:, chair:, user:)
       end
 
-      def ride_user_publish(tx, ride)
-        yet_sent_ride_status = tx.xquery('SELECT * FROM ride_statuses WHERE ride_id = ? AND app_sent_at IS NULL ORDER BY created_at ASC LIMIT 1', ride.fetch(:id)).first
-        status =
-          if yet_sent_ride_status.nil?
-            get_latest_ride_status(tx, ride.fetch(:id))
-          else
-            yet_sent_ride_status.fetch(:status)
-          end
+      def ride_user_publish(tx, ride:, ride_status:, user:, chair:)
+        yet_sent_ride_status = ride_status
 
-        fare = calculate_discounted_fare(tx, @current_user.id, ride, ride.fetch(:pickup_latitude), ride.fetch(:pickup_longitude), ride.fetch(:destination_latitude), ride.fetch(:destination_longitude))
+        fare = calculate_discounted_fare(tx, user.id, ride, ride.fetch(:pickup_latitude), ride.fetch(:pickup_longitude), ride.fetch(:destination_latitude), ride.fetch(:destination_longitude))
 
         data = {
           ride_id: ride.fetch(:id),
@@ -184,8 +180,7 @@ module Isuride
           updated_at: time_msec(ride.fetch(:updated_at)),
         }
 
-        unless ride.fetch(:chair_id).nil?
-          chair = tx.xquery('SELECT * FROM chairs WHERE id = ?', ride.fetch(:chair_id)).first
+        if chair && ride.fetch(:chair_id)
           stats = get_chair_stats(tx, chair.fetch(:id))
           data[:chair] = {
             id: chair.fetch(:id),
@@ -196,25 +191,12 @@ module Isuride
         end
 
         payload = JSON.dump(data)
+        redis.hset("ride_status:user:#{ride.fetch(:user_id)}", yet_sent_ride_status.fetch(:id).to_s, payload)
         redis.publish("user_notification:#{ride.fetch(:user_id)}", payload)
-        redis.set("last_user_notification:#{ride.fetch(:user_id)}", payload)
       end
 
-      def ride_chair_publish(tx, ride)
-        yet_sent_ride_status = tx.xquery('SELECT * FROM ride_statuses WHERE ride_id = ? AND chair_sent_at IS NULL ORDER BY created_at ASC LIMIT 1', ride.fetch(:id)).first
-        status =
-          if yet_sent_ride_status.nil?
-            get_latest_ride_status(tx, ride.fetch(:id))
-          else
-            yet_sent_ride_status.fetch(:status)
-          end
-
-        user = tx.xquery('SELECT * FROM users WHERE id = ? FOR SHARE', ride.fetch(:user_id)).first
-
-        # unless yet_sent_ride_status.nil?
-        #   tx.xquery('UPDATE ride_statuses SET chair_sent_at = CURRENT_TIMESTAMP(6) WHERE id = ?', yet_sent_ride_status.fetch(:id))
-        #   # XXX: original ha koko de is_busy=false
-        # end
+      def ride_chair_publish(tx, ride:, ride_status:, user:, chair:)
+        yet_sent_ride_status = ride_status
 
         data = {
           ride_id: ride.fetch(:id),
@@ -237,9 +219,8 @@ module Isuride
           data:,
           yet_sent_ride_status_id: yet_sent_ride_status&.fetch(:id) || '',
         })
+        redis.hset("ride_status:chair:#{ride.fetch(:chair_id)}", yet_sent_ride_status.fetch(:id).to_s, payload)
         redis.publish("chair_notification:#{ride.fetch(:chair_id)}", payload)
-        last_payload = JSON.dump(data)
-        redis.set("last_chair_notification:#{ride.fetch(:chair_id)}", last_payload)
       end
     end
   end

@@ -176,6 +176,7 @@ module Isuride
       req = bind_json(PostChairRidesRideIDStatusRequest)
 
       ride = nil
+      ride_status = nil
       db_transaction do |tx|
         ride = tx.xquery('SELECT * FROM rides WHERE id = ? FOR UPDATE', ride_id).first
         if ride.fetch(:chair_id) != @current_chair.id
@@ -183,22 +184,30 @@ module Isuride
         end
 
         case req.status
-	# Acknowledge the ride
+        # Acknowledge the ride
         when 'ENROUTE'
-          tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, chair_id, status) VALUES (?, ?, ?, ?, ?)', ULID.generate, ride.fetch(:id), ride.fetch(:user_id), ride.fetch(:chair_id),'ENROUTE')
-	# After Picking up user
+          rid = ULID.generate
+          tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, chair_id, status) VALUES (?, ?, ?, ?, ?)', rid, ride.fetch(:id), ride.fetch(:user_id), ride.fetch(:chair_id),'ENROUTE')
+          ride_status = {
+            id: rid, ride_id: ride.fetch(:id), user_id: ride.fetch(:user_id), chair_id: ride.fetch(:chair_id), status: 'ENROUTE',
+          }
+        # After Picking up user
         when 'CARRYING'
           status = get_latest_ride_status(tx, ride.fetch(:id))
           if status != 'PICKUP'
             raise HttpError.new(400, 'chair has not arrived yet')
           end
-          tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, chair_id, status) VALUES (?, ?, ?, ?, ?)', ULID.generate, ride.fetch(:id), ride.fetch(:user_id), ride.fetch(:chair_id), 'CARRYING')
+          rid = ULID.generate
+          tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, chair_id, status) VALUES (?, ?, ?, ?, ?)', rid, ride.fetch(:id), ride.fetch(:user_id), ride.fetch(:chair_id), 'CARRYING')
+          ride_status = {
+            id: rid, ride_id: ride.fetch(:id), user_id: ride.fetch(:user_id), chair_id: ride.fetch(:chair_id), status: 'CARRYING',
+          }
         else
           raise HttpError.new(400, 'invalid status')
         end
 
       end
-      ride_publish(db, ride)
+      ride_publish(db:, ride:, ride_status:) if ride_status
 
       status(204)
     end

@@ -166,6 +166,7 @@ module Isuride
       ride_id = ULID.generate
 
       ride = nil
+      ride_status = nil
       fare = db_transaction do |tx|
         rides = tx.xquery('SELECT * FROM rides WHERE user_id = ?', @current_user.id).to_a
 
@@ -188,7 +189,9 @@ module Isuride
           req.destination_coordinate.longitude,
         )
 
-        tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, status) VALUES (?, ?, ?, ?)', ULID.generate, ride_id, @current_user.id, 'MATCHING')
+        rid = ULID.generate
+        ride_status = { id: rid, ride_id: ride_id, user_id: @current_user.id, chair_id: nil, status: 'MATCHING' }
+        tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, status) VALUES (?, ?, ?, ?)', rid, ride_id, @current_user.id, 'MATCHING')
 
         ride_count = tx.xquery('SELECT COUNT(*) FROM rides WHERE user_id = ?', @current_user.id, as: :array).first[0]
 
@@ -217,7 +220,7 @@ module Isuride
         calculate_discounted_fare(tx, @current_user.id, ride, req.pickup_coordinate.latitude, req.pickup_coordinate.longitude, req.destination_coordinate.latitude, req.destination_coordinate.longitude)
 
       end
-      ride_publish(db, ride) if ride
+      ride_publish(db, ride:, ride_status:, user: @current_user) if ride && ride_status
 
       status(202)
       json(ride_id:, fare:)
@@ -262,6 +265,7 @@ module Isuride
       end
 
       ride = nil
+      ride_status = nil
       response = db_transaction do |tx|
         ride = tx.xquery('SELECT * FROM rides WHERE id = ?', ride_id).first
         if ride.nil?
@@ -278,7 +282,9 @@ module Isuride
           raise HttpError.new(404, 'ride not found')
         end
 
-        tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, chair_id, status) VALUES (?, ?, ?, ?, ?)', ULID.generate, ride_id, ride.fetch(:user_id), ride.fetch(:chair_id), 'COMPLETED')
+        rid = ULID.generate
+        tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, chair_id, status) VALUES (?, ?, ?, ?, ?)', rid, ride_id, ride.fetch(:user_id), ride.fetch(:chair_id), 'COMPLETED')
+        ride_status = { id: rid, ride_id: ride_id, user_id: ride.fetch(:user_id), chair_id: ride.fetch(:chair_id), status: 'COMPLETED' }
 
         ride = tx.xquery('SELECT * FROM rides WHERE id = ?', ride_id).first
         if ride.nil?
@@ -306,7 +312,7 @@ module Isuride
           completed_at: time_msec(ride.fetch(:updated_at)),
         }
       end
-      ride_publish(db, ride) if ride
+      ride_publish(db, ride:, ride_status:, user: @current_user) if ride && ride_status
 
       json(response)
     end
