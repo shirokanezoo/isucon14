@@ -15,8 +15,6 @@ module Isuride
       :access_token,
       :latitude,
       :longitude,
-      :first_latitude,
-      :first_longitude,
       :total_distance,
       :created_at,
       :updated_at,
