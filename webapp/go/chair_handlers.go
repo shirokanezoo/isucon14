@@ -267,6 +267,19 @@ func chairGetNotification(w http.ResponseWriter, r *http.Request) {
 				}
 				defer tx.Rollback()
 
+				// tx.xquery(
+				// "UPDATE chairs SET is_busy = FALSE, underway_ride_id = '' where id = ? and underway_ride_id = ?",
+				// ride.fetch(:chair_id), ride.fetch(:id)) if status == 'COMPLETED'
+				data := recv.Data
+				if data.Status == "COMPLETED" {
+					_, err := tx.ExecContext(ctx, `UPDATE chairs SET is_busy = FALSE, underway_ride_id = '' WHERE id = ? AND underway_ride_id = ?`, chair.ID, data.RideID)
+					if err != nil {
+						log.Printf("failed to update underway_ride_id: %v", err)
+						writeError(w, http.StatusInternalServerError, err)
+						return
+					}
+				}
+
 				if recv.YetSentRideStatusID != "" {
 					_, err := tx.ExecContext(ctx, `UPDATE ride_statuses SET chair_sent_at = CURRENT_TIMESTAMP(6) WHERE id = ?`, recv.YetSentRideStatusID)
 					if err != nil {
