@@ -48,6 +48,19 @@ module Isuride
         data_class.new(**data_class.members.map { |key| [key, body[key]] }.to_h)
       end
 
+      def redis
+        Thread.current[:redis] ||= connect_redis
+      end
+
+      def connect_redis
+        Redis.new(
+          host: ENV.fetch('ISUCON_REDIS_HOST', '127.0.0.1'),
+          port: ENV.fetch('ISUCON_REDIS_PORT', '6379').to_i,
+          db: 0,
+          driver: :hiredis,
+        )
+      end
+
       def db
         Thread.current[:db] ||= connect_db
       end

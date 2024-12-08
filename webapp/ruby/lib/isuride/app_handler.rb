@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'ulid'
+require 'sinatra/sse'
 
 require 'isuride/base_handler'
 require 'isuride/payment_gateway'
@@ -375,6 +376,15 @@ module Isuride
       end
 
       json(response)
+
+      sse_stream do |out|
+        redis.subscribe("user_notification:#{@current_user.id}") do |on|
+          on.message do |_, message|
+            data = JSON.parse(message, symbolize_names: true)
+            out.push(data:)
+          end
+        end
+      end
     end
 
     # GET /api/app/nearby-chairs
