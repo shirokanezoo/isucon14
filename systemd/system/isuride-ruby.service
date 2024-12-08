@@ -1,8 +1,7 @@
 [Unit]
 Description=isuride-ruby
 After=syslog.target
-After=mysql.service
-Requires=mysql.service
+After=mysql.service redis-server.service
 
 [Service]
 WorkingDirectory=/home/isucon/webapp/ruby
