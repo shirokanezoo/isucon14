@@ -114,11 +114,11 @@ module Isuride
     # GET /api/chair/notification
     get '/notification' do
       response = db_transaction do |tx|
-        yet_sent_ride_status = tx.xquery('SELECT * FROM ride_statuses WHERE chair_id = ? and chair_sent_at is null for share', @current_chair.id).to_a.sort_by do |s|
+        yet_sent_ride_status = tx.xquery('SELECT * FROM ride_statuses WHERE chair_id = ? and chair_sent_at is null for update', @current_chair.id).to_a.sort_by do |s|
           s[:ride_id] # TODO: index
         end.first
         unless yet_sent_ride_status
-          halt json(data: nil, retry_after_ms: 10)
+          halt json(data: nil, retry_after_ms: 500)
         end
 
         status = yet_sent_ride_status.fetch(:status)
@@ -128,8 +128,6 @@ module Isuride
 
         tx.xquery('UPDATE ride_statuses SET chair_sent_at = CURRENT_TIMESTAMP(6) WHERE id = ?', yet_sent_ride_status.fetch(:id))
         tx.xquery("UPDATE chairs SET is_busy = FALSE, underway_ride_id = '' where id = ? and underway_ride_id = ?", ride.fetch(:chair_id), ride.fetch(:id)) if status == 'COMPLETED'
-
-        retry_after_ms = 10
 
         {
           data: {
@@ -148,7 +146,7 @@ module Isuride
             },
             status:,
           },
-          retry_after_ms:,
+          retry_after_ms: 30,
         }
       end
 

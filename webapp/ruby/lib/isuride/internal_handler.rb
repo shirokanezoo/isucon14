@@ -47,11 +47,11 @@ module Isuride
         puts "MATCHING-TRY:: step=1 ride_id=#{ride.fetch(:id)}"
         candidate_chair = available_chairs.each_value.sort_by do |c|
           cspeed = c.fetch(:speed)
-          pickup_distance = calculate_distance(c.fetch(:latitude) || 0, c.fetch(:longitude) || 0, ride.fetch(:pickup_latitude), ride.fetch(:pickup_longitude))
+          pickup_distance = calculate_distance(c.fetch(:latitude), c.fetch(:longitude), ride.fetch(:pickup_latitude), ride.fetch(:pickup_longitude))
           pickup_speed = pickup_distance / cspeed
           enroute_distance = ride.fetch(:ride_distance)
           enroute_speed = enroute_distance / cspeed
-          #puts "MATCHING-CANDIDATE:: ride_id=#{ride.fetch(:id)} chair_id=#{c.fetch(:id)} pickup=#{pickup_distance}|#{pickup_speed} enroute=#{enroute_distance}/#{enroute_speed} total=#{pickup_distance+enroute_distance}/#{pickup_speed+enroute_speed}"
+          puts "MATCHING-CANDIDATE:: ride_id=#{ride.fetch(:id)} chair_id=#{c.fetch(:id)} pickup=#{pickup_distance}|#{pickup_speed} enroute=#{enroute_distance}/#{enroute_speed} total=#{pickup_distance+enroute_distance}/#{pickup_speed+enroute_speed}"
           pickup_speed + enroute_speed
         end.first
 

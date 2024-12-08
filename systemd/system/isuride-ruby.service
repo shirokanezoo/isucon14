@@ -17,8 +17,8 @@ ExecStop=/bin/kill -s QUIT $MAINPID
 Restart=on-failure
 RestartSec=5
 
-StandardOutput=null
-StandardError=append:/tmp/isu-rack.systemd.log
+StandardOutput=append:/tmp/isu-rack.systemd.log
+StandardError=inherit
 
 [Install]
 WantedBy=multi-user.target
