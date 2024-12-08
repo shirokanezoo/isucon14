@@ -13,15 +13,16 @@ fi
   cd ~/git/webapp/ruby
   #bundle exec stackprof --d3-flamegraph app.rb /run/isuports/stackprof/* > ~isucon/public_html/stackprof.html
 ) || :
-#(
-#  cd ~/git/webapp/go
-#  go build -v -o isuconquest .
-#) || :
+(
+  cd ~/git/webapp/go
+  go build -v -o /home/isucon/webapp/go/isuride .
+) || :
 
 cat env.all.sh env.${isunum}.sh > ~/env.sh
 sudo cp -r ~/git/systemd/system/* /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl restart isuride-ruby.service
+sudo systemctl restart isuride-go.service
 
 sudo cp ~/git/nginx.conf /etc/nginx/nginx.conf
 sudo nginx -t
