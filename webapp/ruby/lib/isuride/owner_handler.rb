@@ -111,18 +111,19 @@ module Isuride
     # GET /api/owner/chairs
     get '/chairs' do
       chairs = db.xquery(<<~SQL, @current_owner.id)
-        SELECT id,
-        owner_id,
-        name,
-        access_token,
-        model,
-        is_active,
-        created_at,
-        updated_at,
-        total_distance,
-        total_distance_updated_at
+        SELECT chairs.id as id,
+        chairs.owner_id as owner_id,
+        chairs.name as `name`,
+        chairs.access_token as access_token,
+        chairs.model as model,
+        chairs.is_active as is_active,
+        chairs.created_at as created_at,
+        chairs.updated_at as updated_at,
+        cl2.total_distance as total_distance,
+        cl2.total_distance_updated_at as total_distance_updated_at
         FROM chairs
-        WHERE owner_id = ?
+        OUTER JOIN chair_locations2 as cl2 ON chairs.id = cl2.id
+        WHERE chairs.owner_id = ?
       SQL
 
       json(
