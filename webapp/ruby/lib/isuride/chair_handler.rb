@@ -8,15 +8,15 @@ module Isuride
   class ChairHandler < BaseHandler
     CurrentChair = Data.define(
       :id,
-      :owner_id,
-      :name,
-      :model,
-      :is_active,
-      :is_busy,
-      :underway_ride_id,
-      :access_token,
-      :created_at,
-      :updated_at,
+      # :owner_id,
+      # :name,
+      # :model,
+      # :is_active,
+      # :is_busy,
+      # :underway_ride_id,
+      # :access_token,
+      # :created_at,
+      # :updated_at,
     )
 
     before do
@@ -28,7 +28,7 @@ module Isuride
       if access_token.nil?
         raise HttpError.new(401, 'chair_session cookie is required')
       end
-      chair = db.xquery('SELECT * FROM chairs WHERE access_token = ? LIMIT 1', access_token).first
+      chair = db.xquery('SELECT id FROM chairs WHERE access_token = ? LIMIT 1', access_token).first
       if chair.nil?
         raise HttpError.new(401, 'invalid access token')
       end
