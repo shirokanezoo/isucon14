@@ -80,7 +80,7 @@ module Isuride
       response = db_transaction do |tx|
         distance_updated_at = Time.now
         distance = 0
-        location = tx.xquery('SELECT * FROM chair_locations2 WHERE id = ? LIMIT 1', @current_chair.id).first
+        location = tx.xquery('SELECT * FROM chair_locations2 WHERE id = ? LIMIT 1 FOR UPDATE', @current_chair.id).first
         if !location.nil?
           distance = (req.latitude - location[:latitude]).abs + (req.longitude - location[:longitude]).abs + location[:total_distance]
         end
