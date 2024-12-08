@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'ulid'
-require 'sinatra/sse'
 
 require 'isuride/base_handler'
 require 'isuride/payment_gateway'
@@ -215,6 +214,8 @@ module Isuride
         ride = tx.xquery('SELECT * FROM rides WHERE id = ?', ride_id).first
 
         calculate_discounted_fare(tx, @current_user.id, ride, req.pickup_coordinate.latitude, req.pickup_coordinate.longitude, req.destination_coordinate.latitude, req.destination_coordinate.longitude)
+
+        ride_publish(tx, ride)
       end
 
       status(202)
@@ -299,6 +300,8 @@ module Isuride
           raise HttpError.new(502, e.message)
         end
 
+        ride_publish(tx, ride)
+
         {
           completed_at: time_msec(ride.fetch(:updated_at)),
         }
@@ -375,15 +378,13 @@ module Isuride
         response
       end
 
-      json(response)
+      # json(response)
 
-      sse_stream do |out|
-        redis.subscribe("user_notification:#{@current_user.id}") do |on|
-          on.message do |_, message|
-            data = JSON.parse(message, symbolize_names: true)
-            out.push(data:)
-          end
-        end
+      content_type 'text/event-stream'
+      stream(:keep_open) do |out|
+        conn = { user_id: @current_user.id, out: }
+        UCONNS << conn
+        out.callback { UCONNS.delete out }
       end
     end
 
@@ -499,43 +500,6 @@ module Isuride
           total_rides_count:,
           total_evaluation_avg:,
         }
-      end
-
-      def calculate_discounted_fare(tx, user_id, ride, pickup_latitude, pickup_longitude, dest_latitude, dest_longitude)
-        discount =
-          if !ride.nil?
-            dest_latitude = ride.fetch(:destination_latitude)
-            dest_longitude = ride.fetch(:destination_longitude)
-            pickup_latitude = ride.fetch(:pickup_latitude)
-            pickup_longitude = ride.fetch(:pickup_longitude)
-
-            # すでにクーポンが紐づいているならそれの割引額を参照
-            coupon = tx.xquery('SELECT * FROM coupons WHERE used_by = ?', ride.fetch(:id)).first
-            if coupon.nil?
-              0
-            else
-              coupon.fetch(:discount)
-            end
-          else
-            # 初回利用クーポンを最優先で使う
-            coupon = tx.xquery("SELECT * FROM coupons WHERE user_id = ? AND code = 'CP_NEW2024' AND used_by IS NULL", user_id).first
-            if coupon.nil?
-              # 無いなら他のクーポンを付与された順番に使う
-              coupon = tx.xquery('SELECT * FROM coupons WHERE user_id = ? AND used_by IS NULL ORDER BY created_at LIMIT 1', user_id).first
-              if coupon.nil?
-                0
-              else
-                coupon.fetch(:discount)
-              end
-            else
-              coupon.fetch(:discount)
-            end
-          end
-
-        metered_fare = FARE_PER_DISTANCE * calculate_distance(pickup_latitude, pickup_longitude, dest_latitude, dest_longitude)
-        discounted_metered_fare = [metered_fare - discount, 0].max
-
-        INITIAL_FARE + discounted_metered_fare
       end
     end
   end
