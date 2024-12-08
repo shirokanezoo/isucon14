@@ -118,7 +118,7 @@ module Isuride
           s[:ride_id] # TODO: index
         end.first
         unless yet_sent_ride_status
-          halt json(data: nil, retry_after_ms: 100)
+          halt json(data: nil, retry_after_ms: 200)
         end
 
         status = yet_sent_ride_status.fetch(:status)
@@ -131,17 +131,17 @@ module Isuride
 
         retry_after_ms = case status
                          when 'MATCHING'
-                           100
+                           30
                          when 'ENROUTE'
-                           100
+                           50
                          when 'PICKUP'
-                           100
+                           50
                          when 'CARRYING'
                            50
                          when 'ARRIVED'
                            50
                          when 'COMPLETED'
-                           300
+                           50
                          end
 
         {
