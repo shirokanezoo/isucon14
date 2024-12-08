@@ -162,7 +162,7 @@ module Isuride
       def ride_user_publish(tx, ride:, ride_status:, user:, chair:)
         yet_sent_ride_status = ride_status
 
-        fare = calculate_discounted_fare(tx, user.id, ride, ride.fetch(:pickup_latitude), ride.fetch(:pickup_longitude), ride.fetch(:destination_latitude), ride.fetch(:destination_longitude))
+        fare = calculate_discounted_fare(tx, user.fetch(:id), ride, ride.fetch(:pickup_latitude), ride.fetch(:pickup_longitude), ride.fetch(:destination_latitude), ride.fetch(:destination_longitude))
 
         data = {
           ride_id: ride.fetch(:id),
