@@ -118,7 +118,7 @@ module Isuride
           s[:ride_id] # TODO: index
         end.first
         unless yet_sent_ride_status
-          halt json(data: nil, retry_after_ms: 500)
+          halt json(data: nil, retry_after_ms: 200)
         end
 
         status = yet_sent_ride_status.fetch(:status)

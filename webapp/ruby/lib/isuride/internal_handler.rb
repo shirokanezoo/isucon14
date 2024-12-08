@@ -51,7 +51,7 @@ module Isuride
           pickup_speed = pickup_distance / cspeed
           enroute_distance = ride.fetch(:ride_distance)
           enroute_speed = enroute_distance / cspeed
-          puts "MATCHING-CANDIDATE:: ride_id=#{ride.fetch(:id)} chair_id=#{c.fetch(:id)} pickup=#{pickup_distance}|#{pickup_speed} enroute=#{enroute_distance}/#{enroute_speed} total=#{pickup_distance+enroute_distance}/#{pickup_speed+enroute_speed}"
+          #puts "MATCHING-CANDIDATE:: ride_id=#{ride.fetch(:id)} chair_id=#{c.fetch(:id)} pickup=#{pickup_distance}|#{pickup_speed} enroute=#{enroute_distance}/#{enroute_speed} total=#{pickup_distance+enroute_distance}/#{pickup_speed+enroute_speed}"
           pickup_speed + enroute_speed
         end.first
 
