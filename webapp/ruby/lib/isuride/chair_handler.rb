@@ -115,7 +115,7 @@ module Isuride
     get '/notification' do
       response = db_transaction do |tx|
         yet_sent_ride_status = tx.xquery('SELECT * FROM ride_statuses WHERE chair_id = ? and chair_sent_at is null for update', @current_chair.id).to_a.sort_by do |s|
-          s.ride_id # TODO: index
+          s[:ride_id] # TODO: index
         end.first
         unless yet_sent_ride_status
           halt json(data: nil, retry_after_ms: 500)
