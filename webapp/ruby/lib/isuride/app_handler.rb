@@ -281,6 +281,8 @@ module Isuride
           raise HttpError.new(404, 'ride not found')
         end
 
+        tx.xquery('UPDATE chairs SET is_busy = FALSE WHERE id = ?', ride.fetch(:chair_id))
+
         payment_token = tx.xquery('SELECT * FROM payment_tokens WHERE user_id = ?', ride.fetch(:user_id)).first
         if payment_token.nil?
           raise HttpError.new(400, 'payment token not registered')
