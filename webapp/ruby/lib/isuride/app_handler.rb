@@ -313,7 +313,7 @@ module Isuride
       response = db_transaction do |tx|
         ride = tx.xquery('SELECT * FROM rides WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', @current_user.id).first
         if ride.nil?
-          halt json(data: nil, retry_after_ms: 30)
+          halt json(data: nil, retry_after_ms: 500)
         end
 
         yet_sent_ride_status = tx.xquery('SELECT * FROM ride_statuses WHERE ride_id = ? AND app_sent_at IS NULL ORDER BY created_at ASC LIMIT 1', ride.fetch(:id)).first
