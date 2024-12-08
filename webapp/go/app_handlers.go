@@ -790,9 +790,6 @@ func appGetNotification(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-t.C:
-			fmt.Fprintf(w, "\n\n")
-			flusher.Flush()
 		case recv := <-recvData:
 			data, err := json.Marshal(recv.Data)
 			if err != nil {
@@ -803,6 +800,7 @@ func appGetNotification(w http.ResponseWriter, r *http.Request) {
 
 			fmt.Fprintf(w, "data: %s\n\n", data)
 			flusher.Flush()
+			slog.InfoContext(ctx, "sent notification", slog.Any("data", recv.Data))
 
 			cleaner(recv.YetSentRideStatusID)
 		}

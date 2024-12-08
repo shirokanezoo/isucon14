@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
-	"time"
 
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/go-redis/v9"
@@ -309,16 +308,10 @@ func chairGetNotification(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	t := time.NewTicker(1 * time.Second)
-	defer t.Stop()
-
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-t.C:
-			fmt.Fprintf(w, "\n\n")
-			flusher.Flush()
 		case recv := <-recvData:
 			data, err := json.Marshal(recv.Data)
 			if err != nil {
@@ -329,6 +322,7 @@ func chairGetNotification(w http.ResponseWriter, r *http.Request) {
 
 			fmt.Fprintf(w, "data: %s\n\n", data)
 			flusher.Flush()
+			slog.InfoContext(ctx, "sent notification", slog.Any("data", recv.Data))
 
 			// Update yetSentRideStatusID
 			cleaner(recv.YetSentRideStatusID, recv.Data)
