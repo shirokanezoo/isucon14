@@ -390,3 +390,5 @@ UPDATE chair_locations2 SET latitude = 68, longitude = -70 WHERE id = '01JDGQ215
 UPDATE chair_locations2 SET latitude = 44, longitude = -7 WHERE id = '01JDFMKWKGZ0AHDHVS375ESFA2';
 UPDATE chair_locations2 SET latitude = -28, longitude = 62 WHERE id = '01JDGJ4J38Y3WPDDP6MRYXFT83';
 UPDATE chair_locations2 SET latitude = 38, longitude = 5 WHERE id = '01JDGST0K0CA9STW3TDMX0XYF4';
+
+INSERT INTO chair_locations2 (id)  SELECT chairs.id FROM chairs LEFT OUTER JOIN chair_locations2 as cl ON chairs.id = cl.id where cl.id IS NULL

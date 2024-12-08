@@ -4,8 +4,8 @@ DROP TABLE IF EXISTS chair_locations2;
 CREATE TABLE chair_locations2
 (
   id         VARCHAR(26) NOT NULL COMMENT '椅子ID',
-  latitude   INTEGER     NOT NULL COMMENT '経度',
-  longitude  INTEGER     NOT NULL COMMENT '緯度',
+  latitude   INTEGER     NULL COMMENT '経度',
+  longitude  INTEGER     NULL COMMENT '緯度',
   total_distance INTEGER NOT NULL DEFAULT 0 COMMENT '移動距離',
   total_distance_updated_at DATETIME(6) NULL COMMENT '移動距離更新日時',
   created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '登録日時',
