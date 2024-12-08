@@ -198,7 +198,6 @@ type chairGetNotificationResponseData struct {
 func chairGetNotification(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	chair := ctx.Value("chair").(*Chair)
-	re := getRedis()
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {

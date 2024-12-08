@@ -9,7 +9,6 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
-	"os"
 	"sort"
 	"strconv"
 	"time"
@@ -670,29 +669,9 @@ type appGetNotificationResponseChairStats struct {
 	TotalEvaluationAvg float64 `json:"total_evaluation_avg"`
 }
 
-func getRedis() *redis.Client {
-	host := os.Getenv("ISUCON_REDIS_HOST")
-	if host == "" {
-		host = "localhost"
-	}
-
-	port := os.Getenv("ISUCON_REDIS_PORT")
-	if port == "" {
-		port = "6379"
-	}
-
-	addr := fmt.Sprintf("%s:%s", host, port)
-
-	return redis.NewClient(&redis.Options{
-		Addr: addr,
-		DB:   0, // use default DB
-	})
-}
-
 func appGetNotification(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user := ctx.Value("user").(*User)
-	re := getRedis()
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {

@@ -15,9 +15,13 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+	"github.com/redis/go-redis/v9"
 )
 
-var db *sqlx.DB
+var (
+	db *sqlx.DB
+	re *redis.Client
+)
 
 func main() {
 	mux := setup()
@@ -64,6 +68,23 @@ func setup() http.Handler {
 		panic(err)
 	}
 	db = _db
+
+	redisHost := os.Getenv("ISUCON_REDIS_HOST")
+	if redisHost == "" {
+		redisHost = "localhost"
+	}
+
+	redisPort := os.Getenv("ISUCON_REDIS_PORT")
+	if redisPort == "" {
+		redisPort = "6379"
+	}
+
+	redisAddr := fmt.Sprintf("%s:%s", redisHost, redisPort)
+
+	re = redis.NewClient(&redis.Options{
+		Addr: redisAddr,
+		DB:   0, // use default DB
+	})
 
 	mux := chi.NewRouter()
 	mux.Use(middleware.Logger)
