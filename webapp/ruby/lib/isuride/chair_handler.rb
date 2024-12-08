@@ -14,12 +14,8 @@ module Isuride
       :is_active,
       :is_busy,
       :access_token,
-      :latitude,
-      :longitude,
-      :total_distance,
       :created_at,
       :updated_at,
-      :total_distance_updated_at,
     )
 
     before do
@@ -83,12 +79,15 @@ module Isuride
       response = db_transaction do |tx|
         distance_updated_at = Time.now
         distance = 0
-        if !@current_chair.latitude.nil? && !@current_chair.longitude.nil?
-          distance = (req.latitude - @current_chair.latitude).abs + (req.longitude - @current_chair.longitude).abs + @current_chair.total_distance
+        location = tx.xquery('SELECT * FROM chair_locations2 WHERE id = ? LIMIT 1', @current_chair.id).first
+        if !location.nil?
+          distance = (req.latitude - location[:latitude]).abs + (req.longitude - location[:longitude]).abs + location[:total_distance]
         end
+
+        # upsert chair locations2
         tx.xquery(
-          'UPDATE chairs SET latitude = ?, longitude = ?, total_distance = ?, total_distance_updated_at = ? WHERE id = ?',
-          req.latitude, req.longitude, distance, distance_updated_at, @current_chair.id
+          'INSERT INTO chair_locations2 (id, latitude, longitude, total_distance, total_distance_updated_at) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = ?',
+          @current_chair.id, req.latitude, req.longitude, distance, distance_updated_at, @current_chair.id
         )
 
         ride = tx.xquery('SELECT * FROM rides WHERE chair_id = ? ORDER BY updated_at DESC LIMIT 1', @current_chair.id).first

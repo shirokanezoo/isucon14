@@ -401,14 +401,16 @@ module Isuride
         end
 
       response = db_transaction do |tx|
-        chairs = tx.query('SELECT * FROM chairs WHERE is_busy = FALSE and is_active = TRUE')
+        chairs = tx.query(
+          'SELECT chairs.*, chair_locations2.latitude as latitude, chair_locations2.longitude as longitude FROM chairs OUTER JOIN chair_locations2 ON chairs.id = chair_locations2.id WHERE is_busy = FALSE and is_active = TRUE'
+        )
 
         nearby_chairs = chairs.filter_map do |chair|
-          if chair.fetch(:latitude).nil? || chair.fetch(:longitude).nil?
+          if chair.fetch(:longitude).nil? || chair.fetch(:latitude).nil?
             next
           end
 
-          if calculate_distance(latitude, longitude, chair.fetch(:latitude), chair.fetch(:longitude)) <= distance
+          if calculate_distance(latitude, longitude, chair_location.fetch(:latitude), chair_location.fetch(:longitude)) <= distance
             {
               id: chair.fetch(:id),
               name: chair.fetch(:name),
