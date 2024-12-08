@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -223,7 +222,7 @@ func chairGetNotification(w http.ResponseWriter, r *http.Request) {
 		if data.Status == "COMPLETED" {
 			_, err := tx.ExecContext(ctx, `UPDATE chairs SET is_busy = FALSE, underway_ride_id = '' WHERE id = ? AND underway_ride_id = ?`, chair.ID, data.RideID)
 			if err != nil {
-				log.Printf("failed to update underway_ride_id: %v", err)
+				slog.Error("failed to update underway_ride_id: " + err.Error())
 				writeError(w, http.StatusInternalServerError, err)
 				return
 			}
@@ -232,14 +231,14 @@ func chairGetNotification(w http.ResponseWriter, r *http.Request) {
 		if ysrID != "" {
 			_, err := tx.ExecContext(ctx, `UPDATE ride_statuses SET chair_sent_at = CURRENT_TIMESTAMP(6) WHERE id = ?`, ysrID)
 			if err != nil {
-				log.Printf("failed to update yet_sent_ride_status_id: %v", err)
+				slog.Error("failed to update yet_sent_ride_status_id: " + err.Error())
 				writeError(w, http.StatusInternalServerError, err)
 				return
 			}
 		}
 
 		if err := tx.Commit(); err != nil {
-			log.Printf("failed to update yet_sent_ride_status_id: %v", err)
+			slog.Error("failed to update yet_sent_ride_status_id: " + err.Error())
 			writeError(w, http.StatusInternalServerError, err)
 			return
 		}
@@ -263,6 +262,7 @@ func chairGetNotification(w http.ResponseWriter, r *http.Request) {
 	for _, id := range letestNotificationIDs {
 		payload := letestNotifications[id]
 		payloadData := chairPublishedMessage{}
+		slog.Debug("payload: " + payload)
 		if err := json.Unmarshal([]byte(payload), &payloadData); err != nil {
 			slog.ErrorContext(ctx, err.Error())
 			writeError(w, http.StatusInternalServerError, err)
@@ -299,6 +299,7 @@ func chairGetNotification(w http.ResponseWriter, r *http.Request) {
 
 			if msg, ok := recv.(*redis.Message); ok {
 				published := chairPublishedMessage{}
+				slog.Debug("payload: " + msg.Payload)
 				err := json.Unmarshal([]byte(msg.Payload), &published)
 				if err != nil {
 					return
@@ -315,7 +316,7 @@ func chairGetNotification(w http.ResponseWriter, r *http.Request) {
 		case recv := <-recvData:
 			data, err := json.Marshal(recv.Data)
 			if err != nil {
-				log.Printf("failed to marshal data: %v", err)
+				slog.Error(err.Error())
 				writeError(w, http.StatusInternalServerError, err)
 				return
 			}
