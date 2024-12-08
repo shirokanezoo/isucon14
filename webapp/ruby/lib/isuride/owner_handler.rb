@@ -134,7 +134,7 @@ module Isuride
             model: chair.fetch(:model),
             active: chair.fetch(:is_active),
             registered_at: time_msec(chair.fetch(:created_at)),
-            total_distance: chair.fetch(:total_distance),
+            total_distance: chair.fetch(:total_distance) || 0,
           }.tap do |c|
             unless chair.fetch(:total_distance_updated_at).nil?
               c[:total_distance_updated_at] = time_msec(chair.fetch(:total_distance_updated_at))
