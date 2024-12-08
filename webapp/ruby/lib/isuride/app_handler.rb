@@ -105,6 +105,8 @@ module Isuride
     get '/rides' do
       items = db_transaction do |tx|
         rides = tx.xquery('SELECT * FROM rides WHERE user_id = ? ORDER BY created_at DESC', @current_user.id)
+        chairs = tx.xquery('SELECT * FROM chairs WHERE id IN (?)', rides.map { |r| r.fetch(:chair_id) }.uniq).to_a.to_h { |c| [c.fetch(:id), c] }
+        owners = tx.xquery('SELECT * FROM owners WHERE id IN (?)', chairs.map { |c| c.fetch(:owner_id) }.uniq).to_a.to_h { |o| [o.fetch(:id), o] }
 
         rides.filter_map do |ride|
           status = get_latest_ride_status(tx, ride.fetch(:id))
@@ -114,8 +116,8 @@ module Isuride
 
           fare = calculate_discounted_fare(tx, @current_user.id, ride, ride.fetch(:pickup_latitude),  ride.fetch(:pickup_longitude), ride.fetch(:destination_latitude), ride.fetch(:destination_longitude))
 
-          chair = tx.xquery('SELECT * FROM chairs WHERE id = ?', ride.fetch(:chair_id)).first
-          owner = tx.xquery('SELECT * FROM owners WHERE id = ?', chair.fetch(:owner_id)).first
+          chair = chairs[ride.fetch(:chair_id)]
+          owner = owners[chair.fetch(:owner_id)]
 
           {
             id: ride.fetch(:id),
