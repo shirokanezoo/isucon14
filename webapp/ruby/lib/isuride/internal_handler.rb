@@ -22,7 +22,7 @@ module Isuride
 
         db_transaction do |tx|
            matched = tx.xquery('SELECT * FROM chairs WHERE is_active = TRUE AND is_busy = FALSE AND id = ? LIMIT 1 for update', matched_id.fetch(:id)).first
-           ride = tx.xquery('SELECT * FROM rides WHERE id = ? AND chair_is IS NULL LIMIT 1 for update', ride_id.fetch(:id)).first
+           ride = tx.xquery('SELECT * FROM rides WHERE id = ? AND chair_id IS NULL LIMIT 1 for update', ride_id.fetch(:id)).first
            if matched && ride
              puts "MATCHING:: chair_id=#{matched.fetch(:id)} ride_id=#{ride.fetch(:id)} ok=true"
              tx.xquery('UPDATE chairs SET is_busy = TRUE WHERE id = ?', matched.fetch(:id))
