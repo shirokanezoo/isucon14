@@ -495,9 +495,6 @@ module Isuride
           if arrived_at.nil? || pickup_at.nil?
             next
           end
-          unless is_completed
-            next
-          end
 
           total_rides_count += 1
           total_evaluation += ride.fetch(:evaluation)

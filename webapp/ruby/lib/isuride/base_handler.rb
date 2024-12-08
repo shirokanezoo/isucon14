@@ -195,6 +195,52 @@ module Isuride
         redis.publish("user_notification:#{ride.fetch(:user_id)}", payload)
       end
 
+      def get_chair_stats(tx, chair_id)
+        rides = tx.xquery('SELECT * FROM rides WHERE chair_id = ? ORDER BY updated_at DESC', chair_id)
+
+        total_rides_count = 0
+        total_evaluation = 0.0
+        rides.each do |ride|
+          ride_statuses = tx.xquery('SELECT * FROM ride_statuses WHERE ride_id = ? ORDER BY created_at', ride.fetch(:id))
+
+          arrived_at = nil
+          pickup_at = nil
+          is_completed = false
+          ride_statuses.each do |status|
+            case status.fetch(:status)
+            when 'ARRIVED'
+              arrived_at = status.fetch(:created_at)
+            when 'CARRYING'
+              pickup_at = status.fetch(:created_at)
+            when 'COMPLETED'
+              is_completed = true
+            end
+          end
+          if arrived_at.nil? || pickup_at.nil?
+            next
+          end
+          unless is_completed
+            next
+          end
+
+          total_rides_count += 1
+          total_evaluation += ride.fetch(:evaluation)
+        end
+
+        total_evaluation_avg =
+          if total_rides_count > 0
+            total_evaluation / total_rides_count
+          else
+            0.0
+          end
+
+        {
+          total_rides_count:,
+          total_evaluation_avg:,
+        }
+      end
+
+
       def ride_chair_publish(tx, ride:, ride_status:, user:, chair:)
         yet_sent_ride_status = ride_status
 
