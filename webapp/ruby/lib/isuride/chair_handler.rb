@@ -81,13 +81,13 @@ module Isuride
         distance_updated_at = Time.now
         distance = 0
         location = tx.xquery('SELECT * FROM chair_locations2 WHERE id = ? LIMIT 1 FOR UPDATE', @current_chair.id).first
-        if location[:latitude] && location[:longitude]
+        if location && location[:latitude] && location[:longitude]
           distance = (req.latitude - location[:latitude]).abs + (req.longitude - location[:longitude]).abs + location[:total_distance]
         end
 
         tx.xquery(
-          'UPDATE chair_locations2 SET latitude = ?, longitude = ?, total_distance = ?, total_distance_updated_at = ? WHERE id = ?',
-          req.latitude, req.longitude, distance, distance_updated_at, @current_chair.id,
+          'INSERT INTO chair_locations2 (id, latitude, longitude, total_distance, total_distance_updated_at) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE latitude = ?, longitude = ?, total_distance = ?, total_distance_updated_at = ?',
+          @current_chair.id, req.latitude, req.longitude, distance, distance_updated_at, req.latitude, req.longitude, distance, distance_updated_at,
         )
 
         ride = tx.xquery('SELECT * FROM rides WHERE chair_id = ? ORDER BY updated_at DESC LIMIT 1', @current_chair.id).first
