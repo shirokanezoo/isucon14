@@ -187,7 +187,7 @@ module Isuride
           req.destination_coordinate.longitude,
         )
 
-        tx.xquery('INSERT INTO ride_statuses (id, ride_id, status) VALUES (?, ?, ?)', ULID.generate, ride_id, 'MATCHING')
+        tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, status) VALUES (?, ?, ?, ?)', ULID.generate, ride_id, @current_user.id, 'MATCHING')
 
         ride_count = tx.xquery('SELECT COUNT(*) FROM rides WHERE user_id = ?', @current_user.id, as: :array).first[0]
 
@@ -274,7 +274,7 @@ module Isuride
           raise HttpError.new(404, 'ride not found')
         end
 
-        tx.xquery('INSERT INTO ride_statuses (id, ride_id, status) VALUES (?, ?, ?)', ULID.generate, ride_id, 'COMPLETED')
+        tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, chair_id, status) VALUES (?, ?, ?, ?, ?)', ULID.generate, ride_id, ride.fetch(:user_id), ride.fetch(:chair_id), 'COMPLETED')
 
         ride = tx.xquery('SELECT * FROM rides WHERE id = ?', ride_id).first
         if ride.nil?

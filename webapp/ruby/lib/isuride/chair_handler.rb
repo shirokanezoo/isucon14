@@ -96,11 +96,11 @@ module Isuride
           status = get_latest_ride_status(tx, ride.fetch(:id))
           if status != 'COMPLETED' && status != 'CANCELED'
             if req.latitude == ride.fetch(:pickup_latitude) && req.longitude == ride.fetch(:pickup_longitude) && status == 'ENROUTE'
-              tx.xquery('INSERT INTO ride_statuses (id, ride_id, status) VALUES (?, ?, ?)', ULID.generate, ride.fetch(:id), 'PICKUP')
+              tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, chair_id, status) VALUES (?, ?, ?, ?, ?)', ULID.generate, ride.fetch(:id), ride.fetch(:user_id), ride.fetch(:chair_id), 'PICKUP')
             end
 
             if req.latitude == ride.fetch(:destination_latitude) && req.longitude == ride.fetch(:destination_longitude) && status == 'CARRYING'
-              tx.xquery('INSERT INTO ride_statuses (id, ride_id, status) VALUES (?, ?, ?)', ULID.generate, ride.fetch(:id), 'ARRIVED')
+              tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, chair_id, status) VALUES (?, ?, ?, ?, ?)', ULID.generate, ride.fetch(:id), ride.fetch(:user_id), ride.fetch(:chair_id),'ARRIVED')
             end
           end
         end
@@ -175,14 +175,14 @@ module Isuride
         case req.status
 	# Acknowledge the ride
         when 'ENROUTE'
-          tx.xquery('INSERT INTO ride_statuses (id, ride_id, status) VALUES (?, ?, ?)', ULID.generate, ride.fetch(:id), 'ENROUTE')
+          tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, chair_id, status) VALUES (?, ?, ?, ?, ?)', ULID.generate, ride.fetch(:id), ride.fetch(:user_id), ride.fetch(:chair_id),'ENROUTE')
 	# After Picking up user
         when 'CARRYING'
           status = get_latest_ride_status(tx, ride.fetch(:id))
           if status != 'PICKUP'
             raise HttpError.new(400, 'chair has not arrived yet')
           end
-          tx.xquery('INSERT INTO ride_statuses (id, ride_id, status) VALUES (?, ?, ?)', ULID.generate, ride.fetch(:id), 'CARRYING')
+          tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, chair_id, status) VALUES (?, ?, ?, ?, ?)', ULID.generate, ride.fetch(:id), ride.fetch(:user_id), ride.fetch(:chair_id), 'CARRYING')
         else
           raise HttpError.new(400, 'invalid status')
         end
