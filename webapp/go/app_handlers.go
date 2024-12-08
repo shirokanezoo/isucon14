@@ -662,10 +662,17 @@ type appGetNotificationResponseChairStats struct {
 }
 
 func getRedis() *redis.Client {
-	addr := os.Getenv("REDIS_ADDR")
-	if addr == "" {
-		addr = "localhost:6379"
+	host := os.Getenv("ISUCON_REDIS_HOST")
+	if host == "" {
+		host = "localhost"
 	}
+
+	port := os.Getenv("ISUCON_REDIS_PORT")
+	if port == "" {
+		port = "6379"
+	}
+
+	addr := fmt.Sprintf("%s:%s", host, port)
 
 	return redis.NewClient(&redis.Options{
 		Addr: addr,
