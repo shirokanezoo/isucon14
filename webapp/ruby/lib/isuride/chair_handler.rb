@@ -81,15 +81,19 @@ module Isuride
         distance_updated_at = Time.now
         distance = 0
         location = tx.xquery('SELECT * FROM chair_locations2 WHERE id = ? LIMIT 1 FOR UPDATE', @current_chair.id).first
-        if !location.nil?
+        if location
           distance = (req.latitude - location[:latitude]).abs + (req.longitude - location[:longitude]).abs + location[:total_distance]
-        end
 
-        # upsert chair locations2
-        tx.xquery(
-          'INSERT INTO chair_locations2 (id, latitude, longitude, total_distance, total_distance_updated_at) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE latitude = ?, longitude = ?, total_distance = ?, total_distance_updated_at = ?',
-          @current_chair.id, req.latitude, req.longitude, distance, distance_updated_at, req.latitude, req.longitude, distance, distance_updated_at,
-        )
+          tx.xquery(
+            'UPDATE chair_locations2 SET latitude = ?, longitude = ?, total_distance = ?, total_distance_updated_at = ? WHERE id = ?',
+            req.latitude, req.longitude, distance, distance_updated_at, @current_chair.id,
+          )
+        else
+          tx.xquery(
+            'INSERT INTO chair_locations2 (id, latitude, longitude, total_distance, total_distance_updated_at) VALUES (?, ?, ?, ?, ?)',
+            @current_chair.id, req.latitude, req.longitude, distance, distance_updated_at,
+          )
+        end
 
         ride = tx.xquery('SELECT * FROM rides WHERE chair_id = ? ORDER BY updated_at DESC LIMIT 1', @current_chair.id).first
         unless ride.nil?
