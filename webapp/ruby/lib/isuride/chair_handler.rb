@@ -54,6 +54,7 @@ module Isuride
       access_token = SecureRandom.hex(32)
 
       db.xquery('INSERT INTO chairs (id, owner_id, name, model, is_active, access_token) VALUES (?, ?, ?, ?, ?, ?)', chair_id, owner.fetch(:id), req.name, req.model, false, access_token)
+      db.xquery('INSERT INTO chair_locations2 (id) VALUES (?)', chair_id)
 
       cookies.set(:chair_session, httponly: false, value: access_token, path: '/')
       status(201)
@@ -81,13 +82,13 @@ module Isuride
         distance_updated_at = Time.now
         distance = 0
         location = tx.xquery('SELECT * FROM chair_locations2 WHERE id = ? LIMIT 1 FOR UPDATE', @current_chair.id).first
-        if location && location[:latitude] && location[:longitude]
+        if location[:latitude] && location[:longitude]
           distance = (req.latitude - location[:latitude]).abs + (req.longitude - location[:longitude]).abs + location[:total_distance]
         end
 
         tx.xquery(
-          'INSERT INTO chair_locations2 (id, latitude, longitude, total_distance, total_distance_updated_at) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE latitude = ?, longitude = ?, total_distance = ?, total_distance_updated_at = ?',
-          @current_chair.id, req.latitude, req.longitude, distance, distance_updated_at, req.latitude, req.longitude, distance, distance_updated_at,
+          'UPDATE chair_locations2 SET latitude = ?, longitude = ?, total_distance = ?, total_distance_updated_at = ? WHERE id = ?',
+          req.latitude, req.longitude, distance, distance_updated_at, @current_chair.id,
         )
 
         ride = tx.xquery('SELECT * FROM rides WHERE chair_id = ? ORDER BY updated_at DESC LIMIT 1', @current_chair.id).first
