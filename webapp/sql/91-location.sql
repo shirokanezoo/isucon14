@@ -390,3 +390,8 @@ UPDATE chairs SET latitude = 68, longitude = -70 WHERE id = '01JDGQ21581T2B4FA4M
 UPDATE chairs SET latitude = 44, longitude = -7 WHERE id = '01JDFMKWKGZ0AHDHVS375ESFA2';
 UPDATE chairs SET latitude = -28, longitude = 62 WHERE id = '01JDGJ4J38Y3WPDDP6MRYXFT83';
 UPDATE chairs SET latitude = 38, longitude = 5 WHERE id = '01JDGST0K0CA9STW3TDMX0XYF4';
+
+ALTER TABLE chairs ADD COLUMN first_latitude INTEGER NOT NULL DEFAULT 0 COMMENT '緯度';
+ALTER TABLE chairs ADD COLUMN first_longitude INTEGER NOT NULL DEFAULT 0 COMMENT '経度';
+
+UPDATE chairs SET first_latitude = latitude, first_longitude = longitude;
