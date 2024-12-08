@@ -309,7 +309,7 @@ module Isuride
     # GET /api/app/notification
     get '/notification' do
       response = db_transaction do |tx|
-        yet_sent_ride_status = tx.xquery('SELECT * FROM ride_statuses WHERE user_id = ? and user_sent_at is null for update', @current_user.id).to_a.sort_by do |s|
+        yet_sent_ride_status = tx.xquery('SELECT * FROM ride_statuses WHERE user_id = ? and app_sent_at is null for update', @current_user.id).to_a.sort_by do |s|
           s[:ride_id] # TODO: index
         end.first
         unless yet_sent_ride_status
