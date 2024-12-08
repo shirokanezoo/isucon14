@@ -262,7 +262,7 @@ func chairGetNotification(w http.ResponseWriter, r *http.Request) {
 	for _, id := range letestNotificationIDs {
 		payload := letestNotifications[id]
 		payloadData := chairPublishedMessage{}
-		slog.Debug("payload: " + payload)
+		slog.Info("payload: " + payload)
 		if err := json.Unmarshal([]byte(payload), &payloadData); err != nil {
 			slog.ErrorContext(ctx, err.Error())
 			writeError(w, http.StatusInternalServerError, err)
@@ -299,7 +299,7 @@ func chairGetNotification(w http.ResponseWriter, r *http.Request) {
 
 			if msg, ok := recv.(*redis.Message); ok {
 				published := chairPublishedMessage{}
-				slog.Debug("payload: " + msg.Payload)
+				slog.Info("payload: " + msg.Payload)
 				err := json.Unmarshal([]byte(msg.Payload), &published)
 				if err != nil {
 					return

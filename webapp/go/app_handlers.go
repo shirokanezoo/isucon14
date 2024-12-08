@@ -726,7 +726,7 @@ func appGetNotification(w http.ResponseWriter, r *http.Request) {
 	for _, id := range letestNotificationIDs {
 		payload := letestNotifications[id]
 		payloadData := appPublishedMessage{}
-		slog.Debug("payload: " + payload)
+		slog.Info("payload: " + payload)
 		if err := json.Unmarshal([]byte(payload), &payloadData); err != nil {
 			slog.ErrorContext(ctx, err.Error())
 			writeError(w, http.StatusInternalServerError, err)
@@ -763,7 +763,7 @@ func appGetNotification(w http.ResponseWriter, r *http.Request) {
 
 			if msg, ok := recv.(*redis.Message); ok {
 				published := appPublishedMessage{}
-				slog.Debug("payload: " + msg.Payload)
+				slog.Info("payload: " + msg.Payload)
 				err := json.Unmarshal([]byte(msg.Payload), &published)
 				if err != nil {
 					return
