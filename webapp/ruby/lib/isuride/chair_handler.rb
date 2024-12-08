@@ -130,6 +130,7 @@ module Isuride
 
         unless yet_sent_ride_status.nil?
           tx.xquery('UPDATE ride_statuses SET chair_sent_at = CURRENT_TIMESTAMP(6) WHERE id = ?', yet_sent_ride_status.fetch(:id))
+          tx.xquery('UPDATE chairs SET is_busy = FALSE WHERE id = ?', ride.fetch(:id)) if yet_sent_ride_status.fetch(:status) == 'COMPLETED' # TODO: (sorah) completedになった瞬間に送ってもいいかも
         end
 
         {

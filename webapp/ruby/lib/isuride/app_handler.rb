@@ -399,29 +399,10 @@ module Isuride
         end
 
       response = db_transaction do |tx|
-        chairs = tx.query('SELECT * FROM chairs')
+        chairs = tx.query('SELECT * FROM chairs WHERE is_busy = FALSE and is_active = TRUE')
 
         nearby_chairs = chairs.filter_map do |chair|
-          unless chair.fetch(:is_active)
-            next
-          end
-
           if chair.fetch(:latitude).nil? || chair.fetch(:longitude).nil?
-            next
-          end
-
-          rides = tx.xquery('SELECT * FROM rides WHERE chair_id = ? ORDER BY created_at DESC LIMIT 1', chair.fetch(:id))
-
-          skip = false
-          rides.each do |ride|
-            # 過去にライドが存在し、かつ、それが完了していない場合はスキップ
-            status = get_latest_ride_status(tx, ride.fetch(:id))
-            if status != 'COMPLETED'
-              skip = true
-              break
-            end
-          end
-          if skip
             next
           end
 

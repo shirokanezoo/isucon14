@@ -6,3 +6,6 @@ alter table rides add index idx_chair_id_updated_at_desc(chair_id,updated_at DES
 alter table rides add index idx_user_id_created_at_desc(user_id,created_at DESC);
 alter table chairs add index idx_access_token(access_token);
 alter table chairs add index idx_owner_id(owner_id);
+
+alter table chairs add column is_busy tinyint(1) not null default 0;
+alter table chairs add index idx_is_busy(is_busy);

@@ -99,6 +99,7 @@ CREATE TABLE ride_statuses
 (
   id              VARCHAR(26)                                                                NOT NULL,
   ride_id VARCHAR(26)                                                                        NOT NULL COMMENT 'ライドID',
+  -- COMPLETED: evaluation complete
   status          ENUM ('MATCHING', 'ENROUTE', 'PICKUP', 'CARRYING', 'ARRIVED', 'COMPLETED') NOT NULL COMMENT '状態',
   created_at      DATETIME(6)                                                                NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '状態変更日時',
   app_sent_at     DATETIME(6)                                                                NULL COMMENT 'ユーザーへの状態通知日時',
