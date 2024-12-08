@@ -7,7 +7,7 @@ module Isuride
     # このAPIをインスタンス内から一定間隔で叩かせることで、椅子とライドをマッチングさせる
     # GET /api/internal/matching
     get '/matching' do
-      pending_rides = db.query('SELECT id,pickup_latitude,pickup_longitude,destination_latitude,destination_longitude FROM rides WHERE chair_id IS NULL order by id asc').to_a.map do |r|
+      pending_rides = db.query('SELECT * FROM rides WHERE chair_id IS NULL order by id asc').to_a.map do |r|
         r[:ride_distance] = calculate_distance(r.fetch(:pickup_latitude), r.fetch(:pickup_longitude), r.fetch(:destination_latitude), r.fetch(:destination_longitude))
         r
       end
@@ -16,7 +16,7 @@ module Isuride
         halt 204
       end
 
-      available_chairs = db.query('SELECT chairs.id,chair_models.speed,chair_locations2.latitude,chair_locations2.longitude FROM chairs INNER JOIN chair_locations2 ON chairs.id = chair_locations2.id INNER JOIN chair_models ON chairs.model = chair_models.name  WHERE chairs.is_active = TRUE AND chairs.is_busy = FALSE').to_a.map do |r|
+      available_chairs = db.query('SELECT chairs.id,chairs.name,chair_models.speed,chair_locations2.latitude,chair_locations2.longitude FROM chairs INNER JOIN chair_locations2 ON chairs.id = chair_locations2.id INNER JOIN chair_models ON chairs.model = chair_models.name  WHERE chairs.is_active = TRUE AND chairs.is_busy = FALSE').to_a.map do |r|
         r[:speed] = r.fetch(:speed).to_f
         [r[:id], r]
       end.to_h
