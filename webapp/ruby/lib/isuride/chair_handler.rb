@@ -207,7 +207,7 @@ module Isuride
         end
 
       end
-      ride_publish(db:, ride:, ride_status:) if ride_status
+      ride_publish(db, ride:, ride_status:) if ride_status
 
       status(204)
     end

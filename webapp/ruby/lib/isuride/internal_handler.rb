@@ -58,7 +58,7 @@ module Isuride
               nil
             end
           end
-          ride_publish(db:, ride: updated_ride, ride_status: updated_ride_status, chair: updated_chair) if updated_ride
+          ride_publish(db, ride: updated_ride, ride_status: updated_ride_status, chair: updated_chair) if updated_ride
           available_chairs.delete(candidate_chair.fetch(:id))
         rescue Mysql2::Error => e
           warn "MATCHING-ERROR:: ride_id=#{ride.fetch(:id)} candidate_chair_id=#{candidate_chair.fetch(:id)} exception=#{e.full_message}"
