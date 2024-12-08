@@ -6,12 +6,13 @@ Requires=mysql.service
 
 [Service]
 WorkingDirectory=/home/isucon/webapp/ruby
+RuntimeDirectory=isuride
 Environment=RUBY_YJIT_ENABLE=1
 EnvironmentFile=/home/isucon/env.sh
 
 User=isucon
 Group=isucon
-ExecStart=/home/isucon/.x bundle exec puma --bind tcp://0.0.0.0:8080 --workers 8 --threads 0:8 --environment production
+ExecStart=/home/isucon/.x bundle exec puma --bind unix:///run/isuride/puma.sock --workers ${WORKER_NUM} --threads 8:8 --environment production
 ExecStop=/bin/kill -s QUIT $MAINPID
 
 Restart=on-failure
