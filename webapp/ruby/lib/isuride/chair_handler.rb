@@ -118,7 +118,7 @@ module Isuride
           s[:ride_id] # TODO: index
         end.first
         unless yet_sent_ride_status
-          halt json(data: nil, retry_after_ms: 200)
+          halt json(data: nil, retry_after_ms: 10)
         end
 
         status = yet_sent_ride_status.fetch(:status)
@@ -129,20 +129,7 @@ module Isuride
         tx.xquery('UPDATE ride_statuses SET chair_sent_at = CURRENT_TIMESTAMP(6) WHERE id = ?', yet_sent_ride_status.fetch(:id))
         tx.xquery("UPDATE chairs SET is_busy = FALSE, underway_ride_id = '' where id = ? and underway_ride_id = ?", ride.fetch(:chair_id), ride.fetch(:id)) if status == 'COMPLETED'
 
-        retry_after_ms = case status
-                         when 'MATCHING'
-                           30
-                         when 'ENROUTE'
-                           30
-                         when 'PICKUP'
-                           30
-                         when 'CARRYING'
-                           30
-                         when 'ARRIVED'
-                           30
-                         when 'COMPLETED'
-                           30
-                         end
+        retry_after_ms = 10
 
         {
           data: {
