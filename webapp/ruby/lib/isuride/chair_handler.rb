@@ -133,15 +133,15 @@ module Isuride
                          when 'MATCHING'
                            30
                          when 'ENROUTE'
-                           50
+                           30
                          when 'PICKUP'
-                           50
+                           30
                          when 'CARRYING'
-                           50
+                           30
                          when 'ARRIVED'
-                           50
+                           30
                          when 'COMPLETED'
-                           50
+                           30
                          end
 
         {

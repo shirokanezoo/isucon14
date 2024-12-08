@@ -324,17 +324,17 @@ module Isuride
 
         retry_after_ms = case status
                          when 'MATCHING'
-                           50
+                           30
                          when 'ENROUTE'
-                           50
+                           30
                          when 'PICKUP'
-                           50
+                           30
                          when 'CARRYING'
-                           50
+                           30
                          when 'ARRIVED'
-                           50
+                           30
                          when 'COMPLETED'
-                           50
+                           30
                          end
 
         response = {
