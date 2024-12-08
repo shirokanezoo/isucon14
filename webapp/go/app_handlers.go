@@ -4,12 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/go-redis/v9"
 )
 
 type appPostUsersRequest struct {
@@ -630,10 +633,10 @@ func appPostRideEvaluatation(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-type appGetNotificationResponse struct {
-	Data         *appGetNotificationResponseData `json:"data"`
-	RetryAfterMs int                             `json:"retry_after_ms"`
-}
+// type appGetNotificationResponse struct {
+// 	Data         *appGetNotificationResponseData `json:"data"`
+// 	RetryAfterMs int                             `json:"retry_after_ms"`
+// }
 
 type appGetNotificationResponseData struct {
 	RideID                string                           `json:"ride_id"`
@@ -658,166 +661,139 @@ type appGetNotificationResponseChairStats struct {
 	TotalEvaluationAvg float64 `json:"total_evaluation_avg"`
 }
 
+func getRedis() *redis.Client {
+	host := os.Getenv("ISUCON_REDIS_HOST")
+	if host == "" {
+		host = "localhost"
+	}
+
+	port := os.Getenv("ISUCON_REDIS_PORT")
+	if port == "" {
+		port = "6379"
+	}
+
+	addr := fmt.Sprintf("%s:%s", host, port)
+
+	return redis.NewClient(&redis.Options{
+		Addr: addr,
+		DB:   0, // use default DB
+	})
+}
+
 func appGetNotification(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user := ctx.Value("user").(*User)
+	re := getRedis()
 
-	tx, err := db.Beginx()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err)
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, errors.New("streaming unsupported"))
 		return
 	}
-	defer tx.Rollback()
+	defer flusher.Flush()
 
-	ride := &Ride{}
-	if err := tx.GetContext(ctx, ride, `SELECT * FROM rides WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`, user.ID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			writeJSON(w, http.StatusOK, &appGetNotificationResponse{
-				RetryAfterMs: 30,
-			})
-			return
-		}
-		writeError(w, http.StatusInternalServerError, err)
-		return
-	}
+	sub := re.Subscribe(ctx, "user_notification:"+user.ID)
+	defer sub.Close()
 
-	yetSentRideStatus := RideStatus{}
-	status := ""
-	if err := tx.GetContext(ctx, &yetSentRideStatus, `SELECT * FROM ride_statuses WHERE ride_id = ? AND app_sent_at IS NULL ORDER BY created_at ASC LIMIT 1`, ride.ID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			status, err = getLatestRideStatus(ctx, tx, ride.ID)
+	recvData := make(chan string, 10)
+	go func() {
+		for {
+			recv, err := sub.Receive(ctx)
 			if err != nil {
-				writeError(w, http.StatusInternalServerError, err)
 				return
 			}
-		} else {
-			writeError(w, http.StatusInternalServerError, err)
-			return
-		}
-	} else {
-		status = yetSentRideStatus.Status
-	}
 
-	fare, err := calculateDiscountedFare(ctx, tx, user.ID, ride, ride.PickupLatitude, ride.PickupLongitude, ride.DestinationLatitude, ride.DestinationLongitude)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	response := &appGetNotificationResponse{
-		Data: &appGetNotificationResponseData{
-			RideID: ride.ID,
-			PickupCoordinate: Coordinate{
-				Latitude:  ride.PickupLatitude,
-				Longitude: ride.PickupLongitude,
-			},
-			DestinationCoordinate: Coordinate{
-				Latitude:  ride.DestinationLatitude,
-				Longitude: ride.DestinationLongitude,
-			},
-			Fare:      fare,
-			Status:    status,
-			CreatedAt: ride.CreatedAt.UnixMilli(),
-			UpdateAt:  ride.UpdatedAt.UnixMilli(),
-		},
-		RetryAfterMs: 30,
-	}
-
-	if ride.ChairID.Valid {
-		chair := &Chair{}
-		if err := tx.GetContext(ctx, chair, `SELECT * FROM chairs WHERE id = ?`, ride.ChairID); err != nil {
-			writeError(w, http.StatusInternalServerError, err)
-			return
-		}
-
-		stats, err := getChairStats(ctx, tx, chair.ID)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, err)
-			return
-		}
-
-		response.Data.Chair = &appGetNotificationResponseChair{
-			ID:    chair.ID,
-			Name:  chair.Name,
-			Model: chair.Model,
-			Stats: stats,
-		}
-	}
-
-	if yetSentRideStatus.ID != "" {
-		_, err := tx.ExecContext(ctx, `UPDATE ride_statuses SET app_sent_at = CURRENT_TIMESTAMP(6) WHERE id = ?`, yetSentRideStatus.ID)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, err)
-			return
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		writeError(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	writeJSON(w, http.StatusOK, response)
-}
-
-func getChairStats(ctx context.Context, tx *sqlx.Tx, chairID string) (appGetNotificationResponseChairStats, error) {
-	stats := appGetNotificationResponseChairStats{}
-
-	rides := []Ride{}
-	err := tx.SelectContext(
-		ctx,
-		&rides,
-		`SELECT * FROM rides WHERE chair_id = ? ORDER BY updated_at DESC`,
-		chairID,
-	)
-	if err != nil {
-		return stats, err
-	}
-
-	totalRideCount := 0
-	totalEvaluation := 0.0
-	for _, ride := range rides {
-		rideStatuses := []RideStatus{}
-		err = tx.SelectContext(
-			ctx,
-			&rideStatuses,
-			`SELECT * FROM ride_statuses WHERE ride_id = ? ORDER BY created_at`,
-			ride.ID,
-		)
-		if err != nil {
-			return stats, err
-		}
-
-		var arrivedAt, pickupedAt *time.Time
-		var isCompleted bool
-		for _, status := range rideStatuses {
-			if status.Status == "ARRIVED" {
-				arrivedAt = &status.CreatedAt
-			} else if status.Status == "CARRYING" {
-				pickupedAt = &status.CreatedAt
+			select {
+			case <-ctx.Done():
+				return
+			default:
 			}
-			if status.Status == "COMPLETED" {
-				isCompleted = true
+
+			if msg, ok := recv.(*redis.Message); ok {
+				recvData <- msg.Payload
 			}
 		}
-		if arrivedAt == nil || pickupedAt == nil {
-			continue
+	}()
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	t := time.NewTicker(1 * time.Second)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			fmt.Fprintf(w, "\n\n")
+		case data := <-recvData:
+			fmt.Fprintf(w, "data: %s\n\n", data)
 		}
-		if !isCompleted {
-			continue
-		}
 
-		totalRideCount++
-		totalEvaluation += float64(*ride.Evaluation)
+		flusher.Flush()
 	}
-
-	stats.TotalRidesCount = totalRideCount
-	if totalRideCount > 0 {
-		stats.TotalEvaluationAvg = totalEvaluation / float64(totalRideCount)
-	}
-
-	return stats, nil
 }
+
+// func getChairStats(ctx context.Context, tx *sqlx.Tx, chairID string) (appGetNotificationResponseChairStats, error) {
+// 	stats := appGetNotificationResponseChairStats{}
+
+// 	rides := []Ride{}
+// 	err := tx.SelectContext(
+// 		ctx,
+// 		&rides,
+// 		`SELECT * FROM rides WHERE chair_id = ? ORDER BY updated_at DESC`,
+// 		chairID,
+// 	)
+// 	if err != nil {
+// 		return stats, err
+// 	}
+
+// 	totalRideCount := 0
+// 	totalEvaluation := 0.0
+// 	for _, ride := range rides {
+// 		rideStatuses := []RideStatus{}
+// 		err = tx.SelectContext(
+// 			ctx,
+// 			&rideStatuses,
+// 			`SELECT * FROM ride_statuses WHERE ride_id = ? ORDER BY created_at`,
+// 			ride.ID,
+// 		)
+// 		if err != nil {
+// 			return stats, err
+// 		}
+
+// 		var arrivedAt, pickupedAt *time.Time
+// 		var isCompleted bool
+// 		for _, status := range rideStatuses {
+// 			if status.Status == "ARRIVED" {
+// 				arrivedAt = &status.CreatedAt
+// 			} else if status.Status == "CARRYING" {
+// 				pickupedAt = &status.CreatedAt
+// 			}
+// 			if status.Status == "COMPLETED" {
+// 				isCompleted = true
+// 			}
+// 		}
+// 		if arrivedAt == nil || pickupedAt == nil {
+// 			continue
+// 		}
+// 		if !isCompleted {
+// 			continue
+// 		}
+
+// 		totalRideCount++
+// 		totalEvaluation += float64(*ride.Evaluation)
+// 	}
+
+// 	stats.TotalRidesCount = totalRideCount
+// 	if totalRideCount > 0 {
+// 		stats.TotalEvaluationAvg = totalEvaluation / float64(totalRideCount)
+// 	}
+
+// 	return stats, nil
+// }
 
 type appGetNearbyChairsResponse struct {
 	Chairs      []appGetNearbyChairsResponseChair `json:"chairs"`

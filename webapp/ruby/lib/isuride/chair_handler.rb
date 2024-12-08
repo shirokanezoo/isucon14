@@ -195,6 +195,8 @@ module Isuride
         else
           raise HttpError.new(400, 'invalid status')
         end
+
+        ride_publish(tx, ride)
       end
 
       status(204)
