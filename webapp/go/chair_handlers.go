@@ -207,6 +207,10 @@ func chairGetNotification(w http.ResponseWriter, r *http.Request) {
 	}
 	defer flusher.Flush()
 
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
 	cleaner := func(ysrID string, data *chairGetNotificationResponseData) {
 		tx, err := db.Beginx()
 		if err != nil {
@@ -305,10 +309,6 @@ func chairGetNotification(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}()
-
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
 
 	t := time.NewTicker(1 * time.Second)
 	defer t.Stop()
