@@ -378,14 +378,7 @@ module Isuride
         response
       end
 
-      # json(response)
-
-      content_type 'text/event-stream'
-      stream(:keep_open) do |out|
-        conn = { user_id: @current_user.id, out: }
-        UCONNS << conn
-        out.callback { UCONNS.delete out }
-      end
+      json(response)
     end
 
     # GET /api/app/nearby-chairs
