@@ -9,7 +9,7 @@ module Isuride
     get '/matching' do
       # MEMO: 一旦最も待たせているリクエストに適当な空いている椅子マッチさせる実装とする。おそらくもっといい方法があるはず…
       ride_id = db.query('SELECT id FROM rides WHERE chair_id IS NULL ORDER BY created_at LIMIT 1').first
-      unless ride
+      unless ride_id
         halt 204
       end
 
