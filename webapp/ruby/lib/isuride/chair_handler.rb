@@ -13,6 +13,7 @@ module Isuride
       :model,
       :is_active,
       :is_busy,
+      :underway_ride_id,
       :access_token,
       :latitude,
       :longitude,
