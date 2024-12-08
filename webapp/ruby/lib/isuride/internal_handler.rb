@@ -54,8 +54,11 @@ module Isuride
           puts "MATCHING-CANDIDATE:: ride_id=#{ride.fetch(:id)} chair_id=#{c.fetch(:id)} pickup=#{pickup_distance}|#{pickup_speed} enroute=#{enroute_distance}/#{enroute_speed} total=#{pickup_distance+enroute_distance}/#{pickup_speed+enroute_speed}"
           pickup_speed + enroute_speed
         end.first
-        puts "MATCHING-TRY:: step=2 ride_id=#{ride.fetch(:id)} candidate_chair_id=#{candidate_chair.fetch(:id)}"
-        next unless candidate_chair
+
+        puts "MATCHING-TRY:: step=2 ride_id=#{ride.fetch(:id)} candidate_chair_id=#{candidate_chair&.fetch(:id)}"
+        unless candidate_chair
+          return
+        end
 
         begin
           db_transaction(db) do |tx|
@@ -73,6 +76,11 @@ module Isuride
           available_chairs.delete(candidate_chair.fetch(:id))
         rescue Mysql2::Error => e
           warn "MATCHING-ERROR:: ride_id=#{ride.fetch(:id)} candidate_chair_id=#{candidate_chair.fetch(:id)} exception=#{e.full_message}"
+        end
+
+        if available_chairs.empty?
+          puts "MATCHING-LOOP:: skip=no-more-available-chairs"
+          return
         end
       end
     end
