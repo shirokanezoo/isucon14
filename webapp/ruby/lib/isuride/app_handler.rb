@@ -410,7 +410,7 @@ module Isuride
             next
           end
 
-          if calculate_distance(latitude, longitude, chair_location.fetch(:latitude), chair_location.fetch(:longitude)) <= distance
+          if calculate_distance(latitude, longitude, chair.fetch(:latitude), chair.fetch(:longitude)) <= distance
             {
               id: chair.fetch(:id),
               name: chair.fetch(:name),
