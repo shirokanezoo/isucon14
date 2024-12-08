@@ -85,7 +85,7 @@ module Isuride
         distance_updated_at = Time.now
         distance = (req.latitude - @current_chair.first_latitude).abs + (req.longitude - @current_chair.first_longitude).abs
         tx.xquery(
-          'UPDATE chairs SET latitude = ?, longitude = ?, total_distance = total_distance + ?, total_distance_updated_at = ? WHERE id = ?',
+          'UPDATE chairs SET latitude = ?, longitude = ?, total_distance = ?, total_distance_updated_at = ? WHERE id = ?',
           req.latitude, req.longitude, distance, distance_updated_at, @current_chair.id
         )
 
