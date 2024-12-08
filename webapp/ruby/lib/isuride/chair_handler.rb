@@ -12,6 +12,7 @@ module Isuride
       :name,
       :model,
       :is_active,
+      :is_busy,
       :access_token,
       :latitude,
       :longitude,
