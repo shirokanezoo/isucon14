@@ -13,8 +13,12 @@ module Isuride
       :model,
       :is_active,
       :access_token,
+      :latitude,
+      :longitude,
+      :total_distance,
       :created_at,
       :updated_at,
+      :total_distance_updated_at,
     )
 
     before do
@@ -26,7 +30,7 @@ module Isuride
       if access_token.nil?
         raise HttpError.new(401, 'chair_session cookie is required')
       end
-      chair = db.xquery('SELECT * FROM chairs WHERE access_token = ?', access_token).first
+      chair = db.xquery('SELECT * FROM chairs WHERE access_token = ? LIMIT 1', access_token).first
       if chair.nil?
         raise HttpError.new(401, 'invalid access token')
       end
@@ -76,10 +80,12 @@ module Isuride
       req = bind_json(PostChairCoordinateRequest)
 
       response = db_transaction do |tx|
-        chair_location_id = ULID.generate
-        tx.xquery('INSERT INTO chair_locations (id, chair_id, latitude, longitude) VALUES (?, ?, ?, ?)', chair_location_id, @current_chair.id, req.latitude, req.longitude)
-
-        location = tx.xquery('SELECT * FROM chair_locations WHERE id = ?', chair_location_id).first
+        distance_updated_at = Time.now
+        distance = (@current_chair.latitude - req.latitude).abs + (@current_chair.longitude - req.longitude).abs
+        tx.xquery(
+          'UPDATE chairs SET latitude = ?, longitude = ?, total_distance = total_distance + ?, total_distance_updated_at = ? WHERE id = ?',
+          req.latitude, req.longitude, distance, distance_updated_at, @current_chair.id
+        )
 
         ride = tx.xquery('SELECT * FROM rides WHERE chair_id = ? ORDER BY updated_at DESC LIMIT 1', @current_chair.id).first
         unless ride.nil?
@@ -95,7 +101,7 @@ module Isuride
           end
         end
 
-        { recorded_at: time_msec(location.fetch(:created_at)) }
+        { recorded_at: time_msec(distance_updated_at) }
       end
 
       json(response)
