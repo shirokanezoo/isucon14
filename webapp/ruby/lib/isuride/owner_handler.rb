@@ -122,7 +122,7 @@ module Isuride
         cl2.total_distance as total_distance,
         cl2.total_distance_updated_at as total_distance_updated_at
         FROM chairs
-        OUTER JOIN chair_locations2 as cl2 ON chairs.id = cl2.id
+        LEFT OUTER JOIN chair_locations2 as cl2 ON chairs.id = cl2.id
         WHERE chairs.owner_id = ?
       SQL
 
