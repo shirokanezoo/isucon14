@@ -11,7 +11,7 @@ require 'isuride/owner_handler'
 if ENV['ISU_ENABLE_DATADOG'] == 'true'
   require 'datadog'
   require 'datadog/profiling/preload'
-  require 'datadog/statsd'
+  # require 'datadog/statsd'
 
   Datadog.configure do |c|
     c.env = ENV.fetch('RACK_ENV', 'development')
@@ -21,7 +21,7 @@ if ENV['ISU_ENABLE_DATADOG'] == 'true'
     c.tracing.sampling.default_rate = 1.0
     c.profiling.enabled = true
     c.runtime_metrics.enabled = true
-    c.runtime_metrics.statsd = Datadog::Statsd.new
+    # c.runtime_metrics.statsd = Datadog::Statsd.new
   end
 end
 
