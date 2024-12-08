@@ -20,6 +20,8 @@ module Isuride
 
       db.xquery("UPDATE settings SET value = ? WHERE name = 'payment_gateway_url'", req.payment_server)
 
+      redis.flushall
+
       json(language: 'ruby')
     end
 
