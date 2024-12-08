@@ -195,7 +195,9 @@ module Isuride
           }
         end
 
-        redis.publish("user_notification:#{ride.fetch(:user_id)}", JSON.dump(data))
+        payload = JSON.dump(data)
+        redis.publish("user_notification:#{ride.fetch(:user_id)}", payload)
+        redis.publish("last_user_notification:#{ride.fetch(:user_id)}", payload)
       end
 
       def ride_chair_publish(tx, ride)
@@ -231,13 +233,13 @@ module Isuride
           status:,
         }
 
-        redis.publish(
-          "chair_notification:#{ride.fetch(:chair_id)}",
-          JSON.dump({
-            data:,
-            yet_sent_ride_status_id: yet_sent_ride_status&.fetch(:id) || '',
-          })
-        )
+        payload = JSON.dump({
+          data:,
+          yet_sent_ride_status_id: yet_sent_ride_status&.fetch(:id) || '',
+        })
+        redis.publish("chair_notification:#{ride.fetch(:chair_id)}", payload)
+        last_payload = JSON.dump(data)
+        redis.publish("last_chair_notification:#{ride.fetch(:chair_id)}", last_payload)
       end
     end
   end

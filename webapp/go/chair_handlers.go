@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -205,8 +206,20 @@ func chairGetNotification(w http.ResponseWriter, r *http.Request) {
 	}
 	defer flusher.Flush()
 
-	sub := re.Subscribe(ctx, "user_notification:"+chair.ID)
+	sub := re.Subscribe(ctx, "chair_notification:"+chair.ID)
 	defer sub.Close()
+
+	latestSentNotification, err := re.Get(ctx, "last_chair_notification:"+chair.ID).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		slog.ErrorContext(ctx, err.Error())
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	if latestSentNotification != "" {
+		fmt.Fprintf(w, "data: %s\n\n", latestSentNotification)
+		flusher.Flush()
+	}
 
 	recvData := make(chan *chairPublishedMessage, 10)
 	go func() {

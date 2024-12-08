@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -721,6 +722,18 @@ func appGetNotification(w http.ResponseWriter, r *http.Request) {
 
 	t := time.NewTicker(1 * time.Second)
 	defer t.Stop()
+
+	latestSentNotification, err := re.Get(ctx, "last_user_notification:"+user.ID).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		slog.ErrorContext(ctx, err.Error())
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	if latestSentNotification != "" {
+		fmt.Fprintf(w, "data: %s\n\n", latestSentNotification)
+		flusher.Flush()
+	}
 
 	for {
 		select {
