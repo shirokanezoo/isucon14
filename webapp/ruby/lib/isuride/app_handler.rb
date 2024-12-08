@@ -406,6 +406,10 @@ module Isuride
             next
           end
 
+          if chair.fetch(:latitude).nil? || chair.fetch(:longitude).nil?
+            next
+          end
+
           rides = tx.xquery('SELECT * FROM rides WHERE chair_id = ? ORDER BY created_at DESC LIMIT 1', chair.fetch(:id))
 
           skip = false
@@ -421,7 +425,7 @@ module Isuride
             next
           end
 
-          if calculate_distance(latitude, longitude, chair.fetch(:latitude) || 0, chair.fetch(:longitude) || 0) <= distance
+          if calculate_distance(latitude, longitude, chair.fetch(:latitude), chair.fetch(:longitude)) <= distance
             {
               id: chair.fetch(:id),
               name: chair.fetch(:name),
