@@ -165,6 +165,7 @@ module Isuride
 
       ride_id = ULID.generate
 
+      ride = nil
       fare = db_transaction do |tx|
         rides = tx.xquery('SELECT * FROM rides WHERE user_id = ?', @current_user.id).to_a
 
@@ -215,8 +216,8 @@ module Isuride
 
         calculate_discounted_fare(tx, @current_user.id, ride, req.pickup_coordinate.latitude, req.pickup_coordinate.longitude, req.destination_coordinate.latitude, req.destination_coordinate.longitude)
 
-        ride_publish(tx, ride)
       end
+      ride_publish(db, ride) if ride
 
       status(202)
       json(ride_id:, fare:)
@@ -260,6 +261,7 @@ module Isuride
         raise HttpError.new(400, 'evaluation must be between 1 and 5')
       end
 
+      ride = nil
       response = db_transaction do |tx|
         ride = tx.xquery('SELECT * FROM rides WHERE id = ?', ride_id).first
         if ride.nil?
@@ -300,12 +302,11 @@ module Isuride
           raise HttpError.new(502, e.message)
         end
 
-        ride_publish(tx, ride)
-
         {
           completed_at: time_msec(ride.fetch(:updated_at)),
         }
       end
+      ride_publish(db, ride) if ride
 
       json(response)
     end

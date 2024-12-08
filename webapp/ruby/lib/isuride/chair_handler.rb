@@ -175,6 +175,7 @@ module Isuride
       ride_id = params[:ride_id]
       req = bind_json(PostChairRidesRideIDStatusRequest)
 
+      ride = nil
       db_transaction do |tx|
         ride = tx.xquery('SELECT * FROM rides WHERE id = ? FOR UPDATE', ride_id).first
         if ride.fetch(:chair_id) != @current_chair.id
@@ -196,8 +197,8 @@ module Isuride
           raise HttpError.new(400, 'invalid status')
         end
 
-        ride_publish(tx, ride)
       end
+      ride_publish(db, ride)
 
       status(204)
     end
