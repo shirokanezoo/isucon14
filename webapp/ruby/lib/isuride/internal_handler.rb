@@ -11,6 +11,21 @@ module Isuride
        (a_latitude - b_latitude).abs + (a_longitude - b_longitude).abs
     end
 
+    def self.db_transaction(&block)
+      db.query('BEGIN')
+      ok = false
+      begin
+        retval = block.call(db)
+        db.query('COMMIT')
+        ok = true
+        retval
+      ensure
+        unless ok
+          db.query('ROLLBACK')
+        end
+      end
+    end
+
     def self.perform(db)
       pending_rides = db.query('SELECT id,pickup_latitude,pickup_longitude,destination_latitude,destination_longitude FROM rides WHERE chair_id IS NULL order by id asc').to_a.map do |r|
         r[:ride_distance] = calculate_distance(r.fetch(:pickup_latitude), r.fetch(:pickup_longitude), r.fetch(:destination_latitude), r.fetch(:destination_longitude))
