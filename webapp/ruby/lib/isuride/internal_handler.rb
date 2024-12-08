@@ -11,7 +11,7 @@ module Isuride
        (a_latitude - b_latitude).abs + (a_longitude - b_longitude).abs
     end
 
-    def self.db_transaction(&block)
+    def self.db_transaction(db,&block)
       db.query('BEGIN')
       ok = false
       begin
@@ -58,7 +58,7 @@ module Isuride
         next unless candidate_chair
 
         begin
-          db_transaction do |tx|
+          db_transaction(db) do |tx|
              chair2 = tx.xquery('SELECT id FROM chairs WHERE is_active = TRUE AND is_busy = FALSE AND id = ? LIMIT 1 for update', candidate_chair.fetch(:id)).first
              ride2 = tx.xquery('SELECT id FROM rides WHERE id = ? AND chair_id IS NULL LIMIT 1 for update', ride.fetch(:id)).first
              if chair2 && ride2
