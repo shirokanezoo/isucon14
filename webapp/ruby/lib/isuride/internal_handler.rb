@@ -29,8 +29,8 @@ module Isuride
     def self.perform(db)
       pending_rides = db.query('SELECT id,pickup_latitude,pickup_longitude,destination_latitude,destination_longitude FROM rides WHERE chair_id IS NULL order by id asc').to_a.map do |r|
         r[:ride_distance] = calculate_distance(r.fetch(:pickup_latitude), r.fetch(:pickup_longitude), r.fetch(:destination_latitude), r.fetch(:destination_longitude))
-        r
-      end
+        [r[:id], r]
+      end.to_h
       if pending_rides.empty?
         puts "MATCHING-LOOP:: skip=no-pending-rides"
         return
@@ -38,26 +38,26 @@ module Isuride
 
       available_chairs = db.query('SELECT chairs.id,chair_models.speed,chair_locations2.latitude,chair_locations2.longitude FROM chairs INNER JOIN chair_locations2 ON chairs.id = chair_locations2.id INNER JOIN chair_models ON chairs.model = chair_models.name  WHERE chairs.is_active = TRUE AND chairs.is_busy = FALSE').to_a.map do |r|
         r[:speed] = r.fetch(:speed).to_f
-        [r[:id], r]
-      end.to_h
+        r
+      end
 
       puts "MATCHING-LOOP:: pending_rides_count=#{pending_rides.size} available_chairs_count=#{available_chairs.size} complexity=#{pending_rides.size} available_chairs=#{available_chairs.size}"
 
-      pending_rides.each do |ride|
-        puts "MATCHING-TRY:: step=1 ride_id=#{ride.fetch(:id)}"
-        candidate_chair = available_chairs.each_value.sort_by do |c|
-          cspeed = c.fetch(:speed)
-          pickup_distance = calculate_distance(c.fetch(:latitude), c.fetch(:longitude), ride.fetch(:pickup_latitude), ride.fetch(:pickup_longitude))
+      available_chairs.each do |chair|
+        puts "MATCHING-TRY:: step=1 chair_id=#{chair.fetch(:id)}"
+        candidate_ride = pending_rides.each_value.sort_by do |ride|
+          cspeed = chair.fetch(:speed)
+          pickup_distance = calculate_distance(chair.fetch(:latitude), chair.fetch(:longitude), ride.fetch(:pickup_latitude), ride.fetch(:pickup_longitude))
           pickup_speed = pickup_distance / cspeed
           enroute_distance = ride.fetch(:ride_distance)
           enroute_speed = enroute_distance / cspeed
-          puts "MATCHING-CANDIDATE:: ride_id=#{ride.fetch(:id)} chair_id=#{c.fetch(:id)} pickup=#{pickup_distance}|#{pickup_speed} enroute=#{enroute_distance}/#{enroute_speed} total=#{pickup_distance+enroute_distance}/#{pickup_speed+enroute_speed}"
+          puts "MATCHING-CANDIDATE:: ride_id=#{ride.fetch(:id)} chair_id=#{chair.fetch(:id)} pickup=#{pickup_distance}|#{pickup_speed} enroute=#{enroute_distance}/#{enroute_speed} total=#{pickup_distance+enroute_distance}/#{pickup_speed+enroute_speed}"
           pickup_speed + enroute_speed
         end.first
 
-        puts "MATCHING-TRY:: step=2 ride_id=#{ride.fetch(:id)} candidate_chair_id=#{candidate_chair&.fetch(:id)}"
-        unless candidate_chair
-          return
+        puts "MATCHING-TRY:: step=2 chair_id=#{chair.fetch(:id)} candidate_ride_id=#{candidate_ride&.fetch(:id)}"
+        unless candidate_ride
+          next
         end
 
         begin
@@ -71,16 +71,15 @@ module Isuride
                puts "MATCHING-RESOLVE:: chair_id=#{chair2.fetch(:id)} ride_id=#{ride2.fetch(:id)} ok=true"
              else
                puts "MATCHING-RESOLVE:: chair_id=#{chair2.fetch(:id)} ride_id=#{ride2.fetch(:id)} reason=taken-after-tx"
-               available_chairs.delete(candidate_chair.fetch(:id))
              end
           end
-          available_chairs.delete(candidate_chair.fetch(:id))
+          pending_rides.delete(candidate_ride.fetch(:id))
         rescue Mysql2::Error => e
-          warn "MATCHING-ERROR:: ride_id=#{ride.fetch(:id)} candidate_chair_id=#{candidate_chair.fetch(:id)} exception=#{e.full_message}"
+          warn "MATCHING-ERROR:: chair_id=#{chair.fetch(:id)} candidate_ride_id=#{candidate_ride.fetch(:id)} exception=#{e.full_message}"
         end
 
-        if available_chairs.empty?
-          puts "MATCHING-LOOP:: skip=no-more-available-chairs"
+        if available_rides.empty?
+          puts "MATCHING-LOOP:: skip=no-more-available-rides"
           return
         end
       end
