@@ -17,21 +17,7 @@ module Isuride
       :invitation_code,
       :created_at,
       :updated_at,
-    ) do
-      def as_hash
-        {
-          id:,
-          username:,
-          firstname:,
-          lastname:,
-          date_of_birth:,
-          access_token:,
-          invitation_code:,
-          created_at:,
-          updated_at:,
-        }
-      end
-    end
+    )
 
     before do
       if request.path == '/api/app/users'
@@ -179,8 +165,6 @@ module Isuride
 
       ride_id = ULID.generate
 
-      ride = nil
-      ride_status = nil
       fare = db_transaction do |tx|
         rides = tx.xquery('SELECT * FROM rides WHERE user_id = ?', @current_user.id).to_a
 
@@ -203,9 +187,7 @@ module Isuride
           req.destination_coordinate.longitude,
         )
 
-        rid = ULID.generate
-        ride_status = { id: rid, ride_id: ride_id, user_id: @current_user.id, chair_id: nil, status: 'MATCHING' }
-        tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, status) VALUES (?, ?, ?, ?)', rid, ride_id, @current_user.id, 'MATCHING')
+        tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, status) VALUES (?, ?, ?, ?)', ULID.generate, ride_id, @current_user.id, 'MATCHING')
 
         ride_count = tx.xquery('SELECT COUNT(*) FROM rides WHERE user_id = ?', @current_user.id, as: :array).first[0]
 
@@ -232,9 +214,7 @@ module Isuride
         ride = tx.xquery('SELECT * FROM rides WHERE id = ?', ride_id).first
 
         calculate_discounted_fare(tx, @current_user.id, ride, req.pickup_coordinate.latitude, req.pickup_coordinate.longitude, req.destination_coordinate.latitude, req.destination_coordinate.longitude)
-
       end
-      ride_publish(db, ride:, ride_status:, user: @current_user.as_hash) if ride && ride_status
 
       status(202)
       json(ride_id:, fare:)
@@ -278,8 +258,6 @@ module Isuride
         raise HttpError.new(400, 'evaluation must be between 1 and 5')
       end
 
-      ride = nil
-      ride_status = nil
       response = db_transaction do |tx|
         ride = tx.xquery('SELECT * FROM rides WHERE id = ?', ride_id).first
         if ride.nil?
@@ -296,9 +274,7 @@ module Isuride
           raise HttpError.new(404, 'ride not found')
         end
 
-        rid = ULID.generate
-        tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, chair_id, status) VALUES (?, ?, ?, ?, ?)', rid, ride_id, ride.fetch(:user_id), ride.fetch(:chair_id), 'COMPLETED')
-        ride_status = { id: rid, ride_id: ride_id, user_id: ride.fetch(:user_id), chair_id: ride.fetch(:chair_id), status: 'COMPLETED' }
+        tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, chair_id, status) VALUES (?, ?, ?, ?, ?)', ULID.generate, ride_id, ride.fetch(:user_id), ride.fetch(:chair_id), 'COMPLETED')
 
         ride = tx.xquery('SELECT * FROM rides WHERE id = ?', ride_id).first
         if ride.nil?
@@ -326,7 +302,6 @@ module Isuride
           completed_at: time_msec(ride.fetch(:updated_at)),
         }
       end
-      ride_publish(db, ride:, ride_status:, user: @current_user.as_hash) if ride && ride_status
 
       json(response)
     end
@@ -334,33 +309,20 @@ module Isuride
     # GET /api/app/notification
     get '/notification' do
       response = db_transaction do |tx|
-        yet_sent_ride_status = tx.xquery('SELECT * FROM ride_statuses WHERE user_id = ? and app_sent_at is null for update', @current_user.id).to_a.sort_by do |s|
-          s[:ride_id] # TODO: index
-        end.first
-        unless yet_sent_ride_status
-          halt json(data: nil, retry_after_ms: 100)
+        ride = tx.xquery('SELECT * FROM rides WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', @current_user.id).first
+        if ride.nil?
+          halt json(data: nil, retry_after_ms: 500)
         end
 
-        status = yet_sent_ride_status.fetch(:status)
-
-        ride = tx.xquery('SELECT * FROM rides WHERE id = ? FOR SHARE', yet_sent_ride_status.fetch(:ride_id)).first
+        yet_sent_ride_status = tx.xquery('SELECT * FROM ride_statuses WHERE ride_id = ? AND app_sent_at IS NULL ORDER BY created_at ASC LIMIT 1', ride.fetch(:id)).first
+        status =
+          if yet_sent_ride_status.nil?
+            get_latest_ride_status(tx, ride.fetch(:id))
+          else
+            yet_sent_ride_status.fetch(:status)
+          end
 
         fare = calculate_discounted_fare(tx, @current_user.id, ride, ride.fetch(:pickup_latitude), ride.fetch(:pickup_longitude), ride.fetch(:destination_latitude), ride.fetch(:destination_longitude))
-
-        retry_after_ms = case status
-                         when 'MATCHING'
-                           50
-                         when 'ENROUTE'
-                           100
-                         when 'PICKUP'
-                           100
-                         when 'CARRYING'
-                           50
-                         when 'ARRIVED'
-                           100
-                         when 'COMPLETED'
-                           300
-                         end
 
         response = {
           data: {
@@ -378,11 +340,11 @@ module Isuride
             created_at: time_msec(ride.fetch(:created_at)),
             updated_at: time_msec(ride.fetch(:updated_at)),
           },
-          retry_after_ms:,
+          retry_after_ms: 30,
         }
 
         unless ride.fetch(:chair_id).nil?
-          chair = tx.xquery('SELECT id,name,model FROM chairs WHERE id = ?', ride.fetch(:chair_id)).first
+          chair = tx.xquery('SELECT * FROM chairs WHERE id = ?', ride.fetch(:chair_id)).first
           stats = get_chair_stats(tx, chair.fetch(:id))
           response[:data][:chair] = {
             id: chair.fetch(:id),
@@ -495,6 +457,9 @@ module Isuride
           if arrived_at.nil? || pickup_at.nil?
             next
           end
+          unless is_completed
+            next
+          end
 
           total_rides_count += 1
           total_evaluation += ride.fetch(:evaluation)
@@ -511,6 +476,43 @@ module Isuride
           total_rides_count:,
           total_evaluation_avg:,
         }
+      end
+
+      def calculate_discounted_fare(tx, user_id, ride, pickup_latitude, pickup_longitude, dest_latitude, dest_longitude)
+        discount =
+          if !ride.nil?
+            dest_latitude = ride.fetch(:destination_latitude)
+            dest_longitude = ride.fetch(:destination_longitude)
+            pickup_latitude = ride.fetch(:pickup_latitude)
+            pickup_longitude = ride.fetch(:pickup_longitude)
+
+            # すでにクーポンが紐づいているならそれの割引額を参照
+            coupon = tx.xquery('SELECT * FROM coupons WHERE used_by = ?', ride.fetch(:id)).first
+            if coupon.nil?
+              0
+            else
+              coupon.fetch(:discount)
+            end
+          else
+            # 初回利用クーポンを最優先で使う
+            coupon = tx.xquery("SELECT * FROM coupons WHERE user_id = ? AND code = 'CP_NEW2024' AND used_by IS NULL", user_id).first
+            if coupon.nil?
+              # 無いなら他のクーポンを付与された順番に使う
+              coupon = tx.xquery('SELECT * FROM coupons WHERE user_id = ? AND used_by IS NULL ORDER BY created_at LIMIT 1', user_id).first
+              if coupon.nil?
+                0
+              else
+                coupon.fetch(:discount)
+              end
+            else
+              coupon.fetch(:discount)
+            end
+          end
+
+        metered_fare = FARE_PER_DISTANCE * calculate_distance(pickup_latitude, pickup_longitude, dest_latitude, dest_longitude)
+        discounted_metered_fare = [metered_fare - discount, 0].max
+
+        INITIAL_FARE + discounted_metered_fare
       end
     end
   end

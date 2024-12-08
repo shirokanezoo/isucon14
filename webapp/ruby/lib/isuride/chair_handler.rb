@@ -8,15 +8,15 @@ module Isuride
   class ChairHandler < BaseHandler
     CurrentChair = Data.define(
       :id,
-      # :owner_id,
-      # :name,
-      # :model,
-      # :is_active,
-      # :is_busy,
-      # :underway_ride_id,
-      # :access_token,
-      # :created_at,
-      # :updated_at,
+      :owner_id,
+      :name,
+      :model,
+      :is_active,
+      :is_busy,
+      :underway_ride_id,
+      :access_token,
+      :created_at,
+      :updated_at,
     )
 
     before do
@@ -28,7 +28,7 @@ module Isuride
       if access_token.nil?
         raise HttpError.new(401, 'chair_session cookie is required')
       end
-      chair = db.xquery('SELECT id FROM chairs WHERE access_token = ? LIMIT 1', access_token).first
+      chair = db.xquery('SELECT * FROM chairs WHERE access_token = ? LIMIT 1', access_token).first
       if chair.nil?
         raise HttpError.new(401, 'invalid access token')
       end
@@ -118,7 +118,7 @@ module Isuride
           s[:ride_id] # TODO: index
         end.first
         unless yet_sent_ride_status
-          halt json(data: nil, retry_after_ms: 100)
+          halt json(data: nil, retry_after_ms: 500)
         end
 
         status = yet_sent_ride_status.fetch(:status)
@@ -128,21 +128,6 @@ module Isuride
 
         tx.xquery('UPDATE ride_statuses SET chair_sent_at = CURRENT_TIMESTAMP(6) WHERE id = ?', yet_sent_ride_status.fetch(:id))
         tx.xquery("UPDATE chairs SET is_busy = FALSE, underway_ride_id = '' where id = ? and underway_ride_id = ?", ride.fetch(:chair_id), ride.fetch(:id)) if status == 'COMPLETED'
-
-        retry_after_ms = case status
-                         when 'MATCHING'
-                           100
-                         when 'ENROUTE'
-                           100
-                         when 'PICKUP'
-                           100
-                         when 'CARRYING'
-                           50
-                         when 'ARRIVED'
-                           50
-                         when 'COMPLETED'
-                           300
-                         end
 
         {
           data: {
@@ -161,7 +146,7 @@ module Isuride
             },
             status:,
           },
-          retry_after_ms:,
+          retry_after_ms: 30,
         }
       end
 
@@ -175,8 +160,6 @@ module Isuride
       ride_id = params[:ride_id]
       req = bind_json(PostChairRidesRideIDStatusRequest)
 
-      ride = nil
-      ride_status = nil
       db_transaction do |tx|
         ride = tx.xquery('SELECT * FROM rides WHERE id = ? FOR UPDATE', ride_id).first
         if ride.fetch(:chair_id) != @current_chair.id
@@ -184,30 +167,20 @@ module Isuride
         end
 
         case req.status
-        # Acknowledge the ride
+	# Acknowledge the ride
         when 'ENROUTE'
-          rid = ULID.generate
-          tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, chair_id, status) VALUES (?, ?, ?, ?, ?)', rid, ride.fetch(:id), ride.fetch(:user_id), ride.fetch(:chair_id),'ENROUTE')
-          ride_status = {
-            id: rid, ride_id: ride.fetch(:id), user_id: ride.fetch(:user_id), chair_id: ride.fetch(:chair_id), status: 'ENROUTE',
-          }
-        # After Picking up user
+          tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, chair_id, status) VALUES (?, ?, ?, ?, ?)', ULID.generate, ride.fetch(:id), ride.fetch(:user_id), ride.fetch(:chair_id),'ENROUTE')
+	# After Picking up user
         when 'CARRYING'
           status = get_latest_ride_status(tx, ride.fetch(:id))
           if status != 'PICKUP'
             raise HttpError.new(400, 'chair has not arrived yet')
           end
-          rid = ULID.generate
-          tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, chair_id, status) VALUES (?, ?, ?, ?, ?)', rid, ride.fetch(:id), ride.fetch(:user_id), ride.fetch(:chair_id), 'CARRYING')
-          ride_status = {
-            id: rid, ride_id: ride.fetch(:id), user_id: ride.fetch(:user_id), chair_id: ride.fetch(:chair_id), status: 'CARRYING',
-          }
+          tx.xquery('INSERT INTO ride_statuses (id, ride_id, user_id, chair_id, status) VALUES (?, ?, ?, ?, ?)', ULID.generate, ride.fetch(:id), ride.fetch(:user_id), ride.fetch(:chair_id), 'CARRYING')
         else
           raise HttpError.new(400, 'invalid status')
         end
-
       end
-      ride_publish(db, ride:, ride_status:) if ride_status
 
       status(204)
     end
