@@ -26,7 +26,7 @@ module Isuride
            ride = tx.xquery('SELECT * FROM rides WHERE id = ? AND chair_id IS NULL LIMIT 1 for update', ride_id.fetch(:id)).first
            if matched && ride
              puts "MATCHING:: chair_id=#{matched.fetch(:id)} ride_id=#{ride.fetch(:id)} ok=true"
-             tx.xquery('UPDATE chairs SET is_busy = TRUE WHERE id = ?', matched.fetch(:id))
+             tx.xquery('UPDATE chairs SET is_busy = TRUE, underway_ride_id = ? WHERE id = ?', ride.fetch(:id), matched.fetch(:id))
              tx.xquery('UPDATE rides SET chair_id = ? WHERE id = ?', matched.fetch(:id), ride.fetch(:id))
              ok = true
            else
