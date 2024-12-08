@@ -87,8 +87,8 @@ module Isuride
 
         # upsert chair locations2
         tx.xquery(
-          'INSERT INTO chair_locations2 (id, latitude, longitude, total_distance, total_distance_updated_at) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = ?',
-          @current_chair.id, req.latitude, req.longitude, distance, distance_updated_at, @current_chair.id
+          'INSERT INTO chair_locations2 (id, latitude, longitude, total_distance, total_distance_updated_at) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE latitude = ?, longitude = ?, total_distance = ?, total_distance_updated_at = ?',
+          @current_chair.id, req.latitude, req.longitude, distance, distance_updated_at, req.latitude, req.longitude, distance, distance_updated_at,
         )
 
         ride = tx.xquery('SELECT * FROM rides WHERE chair_id = ? ORDER BY updated_at DESC LIMIT 1', @current_chair.id).first
