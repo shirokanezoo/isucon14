@@ -4,22 +4,11 @@ GEM
     base64 (0.2.0)
     bigdecimal (3.1.8)
     connection_pool (2.4.1)
-    datadog (2.7.1)
-      datadog-ruby_core_source (~> 3.3)
-      libdatadog (~> 14.1.0.1.0)
-      libddwaf (~> 1.15.0.0.0)
-      msgpack
-    datadog-ruby_core_source (3.3.6)
     diff-lcs (1.5.1)
-    ffi (1.17.0)
     http-2 (1.0.2)
     httpx (1.3.4)
       http-2 (>= 1.0.0)
-    libdatadog (14.1.0.1.0)
-    libddwaf (1.15.0.0.0)
-      ffi (~> 1.0)
     logger (1.6.2)
-    msgpack (1.7.5)
     multi_json (1.15.0)
     mustermann (3.0.3)
       ruby2_keywords (~> 0.0.1)
@@ -75,7 +64,6 @@ PLATFORMS
 
 DEPENDENCIES
   bigdecimal
-  datadog
   httpx
   mysql2
   mysql2-cs-bind
