@@ -14,8 +14,8 @@ if ENV['ISU_ENABLE_DATADOG'] == 'true'
   require 'datadog/statsd'
 
   Datadog.configure do |c|
-    c.env = 'dev-mirakui'
-    c.service = 'isupipe-after'
+    c.env = ENV.fetch('RACK_ENV', 'development')
+    c.service = 'isuride'
     c.tracing.instrument :sinatra
     c.tracing.instrument :mysql2, comment_propagation: 'full', append_comment: true
     c.tracing.sampling.default_rate = 1.0
