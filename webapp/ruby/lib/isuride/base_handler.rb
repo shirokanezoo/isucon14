@@ -175,7 +175,7 @@ module Isuride
             longitude: ride.fetch(:destination_longitude),
           },
           fare:,
-          status:,
+          status: ride_status.fetch(:status),
           created_at: time_msec(ride.fetch(:created_at)),
           updated_at: time_msec(ride.fetch(:updated_at)),
         }
@@ -258,7 +258,7 @@ module Isuride
             latitude: ride.fetch(:destination_latitude),
             longitude: ride.fetch(:destination_longitude),
           },
-          status:,
+          status: ride_status.fetch(:status),
         }
 
         payload = JSON.dump({
