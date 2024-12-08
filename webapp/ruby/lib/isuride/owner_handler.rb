@@ -86,7 +86,7 @@ module Isuride
 
         model_sales_by_model = Hash.new { |h, k| h[k] = 0 }
         chairs.each do |chair|
-          rides = tx.xquery("SELECT rides.* FROM rides JOIN ride_statuses ON rides.id = ride_statuses.ride_id WHERE chair_id = ? AND status = 'COMPLETED' AND updated_at BETWEEN ? AND ? + INTERVAL 999 MICROSECOND", chair.fetch(:id), since, until_).to_a
+          rides = tx.xquery("SELECT rides.* FROM rides JOIN ride_statuses ON rides.id = ride_statuses.ride_id WHERE rides.chair_id = ? AND status = 'COMPLETED' AND updated_at BETWEEN ? AND ? + INTERVAL 999 MICROSECOND", chair.fetch(:id), since, until_).to_a
 
           sales = sum_sales(rides)
           res[:total_sales] += sales
