@@ -21,7 +21,7 @@ fi
 cat env.all.sh env.${isunum}.sh > ~/env.sh
 sudo cp -r ~/git/systemd/system/* /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl restart isupipe-ruby.service
+sudo systemctl restart isuride-ruby.service
 
 sudo cp ~/git/nginx.conf /etc/nginx/nginx.conf
 sudo nginx -t
