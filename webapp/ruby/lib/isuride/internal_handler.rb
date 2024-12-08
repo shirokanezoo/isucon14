@@ -20,6 +20,7 @@ module Isuride
           halt 204
         end
 
+        ok = false
         db_transaction do |tx|
            matched = tx.xquery('SELECT * FROM chairs WHERE is_active = TRUE AND is_busy = FALSE AND id = ? LIMIT 1 for update', matched_id.fetch(:id)).first
            ride = tx.xquery('SELECT * FROM rides WHERE id = ? AND chair_id IS NULL LIMIT 1 for update', ride_id.fetch(:id)).first
@@ -27,11 +28,12 @@ module Isuride
              puts "MATCHING:: chair_id=#{matched.fetch(:id)} ride_id=#{ride.fetch(:id)} ok=true"
              tx.xquery('UPDATE chairs SET is_busy = TRUE WHERE id = ?', matched.fetch(:id))
              tx.xquery('UPDATE rides SET chair_id = ? WHERE id = ?', matched.fetch(:id), ride.fetch(:id))
-             halt 204
+             ok = true
            else
              puts "MATCHING:: chair_id=#{matched.fetch(:id)} ride_id=#{ride.fetch(:id)} reason=taken-after-tx"
            end
         end
+        break if ok
       end
 
       204
