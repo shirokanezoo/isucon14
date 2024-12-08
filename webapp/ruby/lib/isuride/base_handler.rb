@@ -91,7 +91,7 @@ module Isuride
 
       # マンハッタン距離を求める
       def calculate_distance(a_latitude, a_longitude, b_latitude, b_longitude)
-        (a_latitude - b_latitude).abs + (a_longitude - b_longitude).abs
+        (a_latitude - (b_latitude || 0)).abs + (a_longitude - (b_longitude || 0)).abs
       end
 
       def calculate_fare(pickup_latitude, pickup_longitude, dest_latitude, dest_longitude)
