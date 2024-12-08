@@ -156,7 +156,7 @@ module Isuride
         chair ||= ride[:chair_id] && tx.xquery('SELECT * FROM charis id = ?', ride.fetch(:chair_id)).first
         user ||= tx.xquery('SELECT * FROM users WHERE id = ?', ride.fetch(:user_id)).first
         ride_user_publish(tx, ride:, ride_status:, chair:, user:)
-        ride_chair_publish(tx, ride:, ride_status:, chair:, user:)
+        ride_chair_publish(tx, ride:, ride_status:, chair:, user:) if ride[:chair_id]
       end
 
       def ride_user_publish(tx, ride:, ride_status:, user:, chair:)
