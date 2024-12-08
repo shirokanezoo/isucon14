@@ -313,7 +313,7 @@ module Isuride
           s[:ride_id] # TODO: index
         end.first
         unless yet_sent_ride_status
-          halt json(data: nil, retry_after_ms: 200)
+          halt json(data: nil, retry_after_ms: 80)
         end
 
         status = yet_sent_ride_status.fetch(:status)
@@ -322,20 +322,7 @@ module Isuride
 
         fare = calculate_discounted_fare(tx, @current_user.id, ride, ride.fetch(:pickup_latitude), ride.fetch(:pickup_longitude), ride.fetch(:destination_latitude), ride.fetch(:destination_longitude))
 
-        retry_after_ms = case status
-                         when 'MATCHING'
-                           30
-                         when 'ENROUTE'
-                           30
-                         when 'PICKUP'
-                           30
-                         when 'CARRYING'
-                           30
-                         when 'ARRIVED'
-                           30
-                         when 'COMPLETED'
-                           30
-                         end
+        retry_after_ms = 10
 
         response = {
           data: {
