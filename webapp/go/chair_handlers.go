@@ -8,6 +8,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/oklog/ulid/v2"
@@ -206,20 +207,79 @@ func chairGetNotification(w http.ResponseWriter, r *http.Request) {
 	}
 	defer flusher.Flush()
 
+	cleaner := func(ysrID string, data *chairGetNotificationResponseData) {
+		tx, err := db.Beginx()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		defer tx.Rollback()
+
+		// tx.xquery(
+		// "UPDATE chairs SET is_busy = FALSE, underway_ride_id = '' where id = ? and underway_ride_id = ?",
+		// ride.fetch(:chair_id), ride.fetch(:id)) if status == 'COMPLETED'
+		if data.Status == "COMPLETED" {
+			_, err := tx.ExecContext(ctx, `UPDATE chairs SET is_busy = FALSE, underway_ride_id = '' WHERE id = ? AND underway_ride_id = ?`, chair.ID, data.RideID)
+			if err != nil {
+				log.Printf("failed to update underway_ride_id: %v", err)
+				writeError(w, http.StatusInternalServerError, err)
+				return
+			}
+		}
+
+		if ysrID != "" {
+			_, err := tx.ExecContext(ctx, `UPDATE ride_statuses SET chair_sent_at = CURRENT_TIMESTAMP(6) WHERE id = ?`, ysrID)
+			if err != nil {
+				log.Printf("failed to update yet_sent_ride_status_id: %v", err)
+				writeError(w, http.StatusInternalServerError, err)
+				return
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			log.Printf("failed to update yet_sent_ride_status_id: %v", err)
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	}
+
 	sub := re.Subscribe(ctx, "chair_notification:"+chair.ID)
 	defer sub.Close()
 
-	latestSentNotification, err := re.Get(ctx, "last_chair_notification:"+chair.ID).Result()
+	letestNotifications, err := re.HGetAll(ctx, "ride_status:chair:"+chair.ID).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		slog.ErrorContext(ctx, err.Error())
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-
-	if latestSentNotification != "" {
-		fmt.Fprintf(w, "data: %s\n\n", latestSentNotification)
-		flusher.Flush()
+	letestNotificationIDs := make([]string, 0, len(letestNotifications))
+	for id := range letestNotifications {
+		letestNotificationIDs = append(letestNotificationIDs, id)
 	}
+	sort.Strings(letestNotificationIDs)
+
+	for _, id := range letestNotificationIDs {
+		payload := letestNotifications[id]
+		payloadData := chairPublishedMessage{}
+		if err := json.Unmarshal([]byte(payload), &payloadData); err != nil {
+			slog.ErrorContext(ctx, err.Error())
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		data, err := json.Marshal(payloadData.Data)
+		if err != nil {
+			slog.ErrorContext(ctx, err.Error())
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		fmt.Fprintf(w, "data: %s\n\n", data)
+		flusher.Flush()
+
+		cleaner(id, payloadData.Data)
+	}
+	re.HDel(ctx, "ride_status:chair:"+chair.ID, letestNotificationIDs...)
 
 	recvData := make(chan *chairPublishedMessage, 10)
 	go func() {
@@ -272,42 +332,7 @@ func chairGetNotification(w http.ResponseWriter, r *http.Request) {
 			flusher.Flush()
 
 			// Update yetSentRideStatusID
-			func() {
-				tx, err := db.Beginx()
-				if err != nil {
-					writeError(w, http.StatusInternalServerError, err)
-					return
-				}
-				defer tx.Rollback()
-
-				// tx.xquery(
-				// "UPDATE chairs SET is_busy = FALSE, underway_ride_id = '' where id = ? and underway_ride_id = ?",
-				// ride.fetch(:chair_id), ride.fetch(:id)) if status == 'COMPLETED'
-				data := recv.Data
-				if data.Status == "COMPLETED" {
-					_, err := tx.ExecContext(ctx, `UPDATE chairs SET is_busy = FALSE, underway_ride_id = '' WHERE id = ? AND underway_ride_id = ?`, chair.ID, data.RideID)
-					if err != nil {
-						log.Printf("failed to update underway_ride_id: %v", err)
-						writeError(w, http.StatusInternalServerError, err)
-						return
-					}
-				}
-
-				if recv.YetSentRideStatusID != "" {
-					_, err := tx.ExecContext(ctx, `UPDATE ride_statuses SET chair_sent_at = CURRENT_TIMESTAMP(6) WHERE id = ?`, recv.YetSentRideStatusID)
-					if err != nil {
-						log.Printf("failed to update yet_sent_ride_status_id: %v", err)
-						writeError(w, http.StatusInternalServerError, err)
-						return
-					}
-				}
-
-				if err := tx.Commit(); err != nil {
-					log.Printf("failed to update yet_sent_ride_status_id: %v", err)
-					writeError(w, http.StatusInternalServerError, err)
-					return
-				}
-			}()
+			cleaner(recv.YetSentRideStatusID, recv.Data)
 		}
 	}
 }

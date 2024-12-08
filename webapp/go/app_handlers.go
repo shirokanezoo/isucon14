@@ -3,11 +3,14 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"time"
 
@@ -639,6 +642,11 @@ func appPostRideEvaluatation(w http.ResponseWriter, r *http.Request) {
 // 	RetryAfterMs int                             `json:"retry_after_ms"`
 // }
 
+type appPublishedMessage struct {
+	Data                *appGetNotificationResponseData `json:"data"`
+	YetSentRideStatusID string                          `json:"yet_sent_ride_status_id"`
+}
+
 type appGetNotificationResponseData struct {
 	RideID                string                           `json:"ride_id"`
 	PickupCoordinate      Coordinate                       `json:"pickup_coordinate"`
@@ -693,10 +701,69 @@ func appGetNotification(w http.ResponseWriter, r *http.Request) {
 	}
 	defer flusher.Flush()
 
+	cleaner := func(ysrID string) {
+		tx, err := db.Beginx()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		defer tx.Rollback()
+
+		if ysrID != "" {
+			_, err := tx.ExecContext(ctx, `UPDATE ride_statuses SET app_sent_at = CURRENT_TIMESTAMP(6) WHERE id = ?`, ysrID)
+			if err != nil {
+				log.Printf("failed to update yet_sent_ride_status_id: %v", err)
+				writeError(w, http.StatusInternalServerError, err)
+				return
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			log.Printf("failed to update yet_sent_ride_status_id: %v", err)
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	}
+
 	sub := re.Subscribe(ctx, "user_notification:"+user.ID)
 	defer sub.Close()
 
-	recvData := make(chan string, 10)
+	letestNotifications, err := re.HGetAll(ctx, "ride_status:user:"+user.ID).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		slog.ErrorContext(ctx, err.Error())
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	letestNotificationIDs := make([]string, 0, len(letestNotifications))
+	for id := range letestNotifications {
+		letestNotificationIDs = append(letestNotificationIDs, id)
+	}
+	sort.Strings(letestNotificationIDs)
+
+	for _, id := range letestNotificationIDs {
+		payload := letestNotifications[id]
+		payloadData := appPublishedMessage{}
+		if err := json.Unmarshal([]byte(payload), &payloadData); err != nil {
+			slog.ErrorContext(ctx, err.Error())
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		data, err := json.Marshal(payloadData.Data)
+		if err != nil {
+			slog.ErrorContext(ctx, err.Error())
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		fmt.Fprintf(w, "data: %s\n\n", data)
+		flusher.Flush()
+
+		cleaner(id)
+	}
+	re.HDel(ctx, "ride_status:user:"+user.ID, letestNotificationIDs...)
+
+	recvData := make(chan *appPublishedMessage, 10)
 	go func() {
 		for {
 			recv, err := sub.Receive(ctx)
@@ -711,7 +778,12 @@ func appGetNotification(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if msg, ok := recv.(*redis.Message); ok {
-				recvData <- msg.Payload
+				published := appPublishedMessage{}
+				err := json.Unmarshal([]byte(msg.Payload), &published)
+				if err != nil {
+					return
+				}
+				recvData <- &published
 			}
 		}
 	}()
@@ -741,11 +813,21 @@ func appGetNotification(w http.ResponseWriter, r *http.Request) {
 			return
 		case <-t.C:
 			fmt.Fprintf(w, "\n\n")
-		case data := <-recvData:
+			flusher.Flush()
+		case recv := <-recvData:
+			data, err := json.Marshal(recv.Data)
+			if err != nil {
+				log.Printf("failed to marshal data: %v", err)
+				writeError(w, http.StatusInternalServerError, err)
+				return
+			}
+
 			fmt.Fprintf(w, "data: %s\n\n", data)
+			flusher.Flush()
+
+			cleaner(recv.YetSentRideStatusID)
 		}
 
-		flusher.Flush()
 	}
 }
 
