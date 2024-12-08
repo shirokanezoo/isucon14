@@ -235,7 +235,7 @@ module Isuride
           "chair_notification:#{ride.fetch(:chair_id)}",
           JSON.dump({
             data:,
-            yet_sent_ride_status_id: yet_sent_ride_status&.fetch(:id)
+            yet_sent_ride_status_id: yet_sent_ride_status&.fetch(:id) || '',
           })
         )
       end
