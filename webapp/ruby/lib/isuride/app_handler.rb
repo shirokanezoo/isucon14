@@ -309,18 +309,16 @@ module Isuride
     # GET /api/app/notification
     get '/notification' do
       response = db_transaction do |tx|
-        ride = tx.xquery('SELECT * FROM rides WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', @current_user.id).first
-        if ride.nil?
-          halt json(data: nil, retry_after_ms: 500)
+        yet_sent_ride_status = tx.xquery('SELECT * FROM ride_statuses WHERE user_id = ? and app_sent_at is null for update', @current_user.id).to_a.sort_by do |s|
+          s[:ride_id] # TODO: index
+        end.first
+        unless yet_sent_ride_status
+          halt json(data: nil, retry_after_ms: 100)
         end
 
-        yet_sent_ride_status = tx.xquery('SELECT * FROM ride_statuses WHERE ride_id = ? AND app_sent_at IS NULL ORDER BY created_at ASC LIMIT 1', ride.fetch(:id)).first
-        status =
-          if yet_sent_ride_status.nil?
-            get_latest_ride_status(tx, ride.fetch(:id))
-          else
-            yet_sent_ride_status.fetch(:status)
-          end
+        status = yet_sent_ride_status.fetch(:status)
+
+        ride = tx.xquery('SELECT * FROM rides WHERE id = ? FOR SHARE', yet_sent_ride_status.fetch(:ride_id)).first
 
         fare = calculate_discounted_fare(tx, @current_user.id, ride, ride.fetch(:pickup_latitude), ride.fetch(:pickup_longitude), ride.fetch(:destination_latitude), ride.fetch(:destination_longitude))
 
@@ -344,7 +342,7 @@ module Isuride
         }
 
         unless ride.fetch(:chair_id).nil?
-          chair = tx.xquery('SELECT * FROM chairs WHERE id = ?', ride.fetch(:chair_id)).first
+          chair = tx.xquery('SELECT id,name,model FROM chairs WHERE id = ?', ride.fetch(:chair_id)).first
           stats = get_chair_stats(tx, chair.fetch(:id))
           response[:data][:chair] = {
             id: chair.fetch(:id),
