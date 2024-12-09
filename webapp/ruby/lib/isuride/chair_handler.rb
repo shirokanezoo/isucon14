@@ -160,8 +160,8 @@ module Isuride
       ride_id = params[:ride_id]
       req = bind_json(PostChairRidesRideIDStatusRequest)
 
-      db_transaction do |tx|
-        ride = tx.xquery('SELECT * FROM rides WHERE id = ? FOR UPDATE', ride_id).first
+      tx=db; begin#db_transaction do |tx|
+        ride = tx.xquery('SELECT * FROM rides WHERE id = ?', ride_id).first
         if ride.fetch(:chair_id) != @current_chair.id
           raise HttpError.new(400, 'not assigned to this ride')
         end
